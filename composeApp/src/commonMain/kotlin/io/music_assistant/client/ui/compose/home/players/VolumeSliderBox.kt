@@ -116,11 +116,12 @@ fun rememberVolumeChange(volume: () -> Float, set: (Float) -> Unit): (Float) -> 
     val volumeNow by rememberUpdatedState(volume)
     val setNow by rememberUpdatedState(set)
     return remember(haptics, feedback) {
-        { value: Float ->
+        val onChange: (Float) -> Unit = { value ->
             if (haptics && value.roundToInt() != volumeNow().roundToInt()) {
                 feedback.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
             }
             setNow(value)
         }
+        onChange
     }
 }
