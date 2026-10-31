@@ -60,6 +60,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -738,9 +739,13 @@ private fun ExpandedPlayerPage(
                 // the volume control is shown for this player.
                 Box(modifier = Modifier.fillMaxWidth().height(36.dp)) {
                     if (player.player.isVolumeSliderAccessible && player.player.currentVolume != null) {
-                        var currentVolume by remember(player.player.currentVolume) {
-                            mutableStateOf(player.player.currentVolume)
+                        var currentVolume by remember { mutableStateOf(player.player.currentVolume) }
+                        // The server echoes each live send; applying it mid-drag would yank the thumb back.
+                        var dragging by remember { mutableStateOf(false) }
+                        LaunchedEffect(player.player.currentVolume) {
+                            if (!dragging) player.player.currentVolume?.let { currentVolume = it }
                         }
+                        val volumeScope = rememberCoroutineScope()
                         val controlTint = colors.controlTint
                         val volumeSliderColors = SliderDefaults.colors().copy(
                             thumbColor = controlTint,
@@ -749,6 +754,28 @@ private fun ExpandedPlayerPage(
                         )
                         val isGroupBound = player.childrenBinds.any { it.isBound }
                         val isGroupForGesture by rememberUpdatedState(isGroupBound)
+                        val currentPlayer by rememberUpdatedState(player)
+                        val volumeSender = remember(isGroupBound) {
+                            LiveVolumeSender(
+                                scope = volumeScope,
+                                throttleMs = if (isGroupBound) {
+                                    LiveVolumeSender.groupThrottleMs(
+                                        currentPlayer.childrenBinds.count { it.isBound },
+                                    )
+                                } else {
+                                    LiveVolumeSender.LIVE_SEND_THROTTLE_MS
+                                },
+                            ) { level ->
+                                playerAction(
+                                    currentPlayer,
+                                    if (isGroupBound) {
+                                        PlayerAction.GroupVolumeSet(level.toDouble())
+                                    } else {
+                                        PlayerAction.VolumeSet(level.toDouble())
+                                    },
+                                )
+                            }
+                        }
                         Row(
                             modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -811,17 +838,16 @@ private fun ExpandedPlayerPage(
                                     value = currentVolume,
                                     valueRange = 0f..100f,
                                     onValueChange = {
+                                        if (!dragging) {
+                                            dragging = true
+                                            volumeSender.start()
+                                        }
                                         currentVolume = it
+                                        volumeSender.send(it)
                                     },
                                     onValueChangeFinished = {
-                                        playerAction(
-                                            player,
-                                            if (player.childrenBinds.none { it.isBound }) {
-                                                PlayerAction.VolumeSet(currentVolume.toDouble())
-                                            } else {
-                                                PlayerAction.GroupVolumeSet(currentVolume.toDouble())
-                                            },
-                                        )
+                                        dragging = false
+                                        volumeSender.finish(currentVolume)
                                     },
                                     thumb = {
                                         SliderDefaults.Thumb(
