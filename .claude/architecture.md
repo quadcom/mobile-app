@@ -191,6 +191,9 @@ actual class PlatformFeature {
   `auth/me`, changes the key, and sends the whole object. One mutex orders the reads and the writes. If
   the read fails, nothing is written. A change from another client between the read and the write is
   lost. Recent searches (`search.recent`, 5 terms) and search sources (`search.sources`) use this path.
+  The web frontend owns the volume slider settings, and the app only reads them: `volume_slider_mode`
+  (`relative` drags from the current volume at half speed, `relativeVolume`) and `volume_haptics`.
+  Compose reads `LocalVolumePreferences`, which `App` provides, in `VolumeSliderBox`.
 - **Search sources**: from schema 63 (`supportsSearchSources`, server 2.10.0), `music/search` takes
   `providers`, and the filter sheet shows a source picker instead of the "In library only" switch.
   `SearchSources` (`ui/compose/search/`) makes the choices like the web frontend: "library", one
