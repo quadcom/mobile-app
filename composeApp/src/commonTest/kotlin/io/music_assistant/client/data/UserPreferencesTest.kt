@@ -42,6 +42,36 @@ class UserPreferencesTest {
     }
 
     @Test
+    fun `volume preferences default to an absolute slider with haptics on`() = runTest {
+        val preferences = UserPreferences(FakePreferencesClient(buildJsonObject { })).apply { refresh() }
+
+        assertFalse(preferences.preferences.value.relativeVolume)
+        assertTrue(preferences.preferences.value.volumeHapticsEnabled)
+    }
+
+    @Test
+    fun `the volume slider mode and haptics keys are read`() = runTest {
+        val client = FakePreferencesClient(
+            buildJsonObject {
+                put("volume_slider_mode", "relative")
+                put("volume_haptics", false)
+            },
+        )
+        val preferences = UserPreferences(client).apply { refresh() }
+
+        assertTrue(preferences.preferences.value.relativeVolume)
+        assertFalse(preferences.preferences.value.volumeHapticsEnabled)
+    }
+
+    @Test
+    fun `an unknown volume slider mode keeps the absolute slider`() = runTest {
+        val client = FakePreferencesClient(buildJsonObject { put("volume_slider_mode", "sideways") })
+        val preferences = UserPreferences(client).apply { refresh() }
+
+        assertFalse(preferences.preferences.value.relativeVolume)
+    }
+
+    @Test
     fun `nothing is written when the preferences cannot be read`() = runTest {
         val client = FakePreferencesClient(buildJsonObject { put("theme", "dark") }).apply { failFetch = true }
         val preferences = UserPreferences(client)

@@ -388,20 +388,27 @@ private fun VolumeRow(
                 },
             )
         }
+        val onVolumeChange = rememberVolumeChange(
+            volume = { currentVolume },
+            set = { currentVolume = it },
+        )
+        val onVolumeChangeFinished = { onVolumeSet(currentVolume) }
         VolumeSliderBox(
             modifier = Modifier.weight(1f),
             enabled = enabled,
             volume = { currentVolume },
             onStepDown = onStepDown,
             onStepUp = onStepUp,
+            onValueChange = onVolumeChange,
+            onValueChangeFinished = onVolumeChangeFinished,
         ) {
             Slider(
                 modifier = Modifier.fillMaxWidth().alphaOn(enabled),
                 value = currentVolume,
                 valueRange = 0f..100f,
                 enabled = enabled,
-                onValueChange = { currentVolume = it },
-                onValueChangeFinished = { onVolumeSet(currentVolume) },
+                onValueChange = onVolumeChange,
+                onValueChangeFinished = onVolumeChangeFinished,
                 thumb = {
                     SliderDefaults.Thumb(
                         interactionSource = remember { MutableInteractionSource() },
