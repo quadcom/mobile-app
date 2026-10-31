@@ -26,9 +26,12 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,6 +71,7 @@ fun GroupSettings(
     onAdjustPlaybackDelay: ((Int) -> Unit) = {},
     canLeaveGroup: Boolean = false,
 ) {
+    val groupThrottleMs = LiveVolumeSender.groupThrottleMs(player.childrenBinds.count { it.isBound })
     Column(
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -78,7 +82,8 @@ fun GroupSettings(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (player.player.isGrouped) {
-                item(key = player.player.groupVolume) {
+                // A constant key: a volume-based key would rebuild the row, and its slider, on every echo mid-drag.
+                item(key = "group_volume") {
                     GroupPlayerItemCard {
                         GroupItemTitle(
                             isEnabled = player.player.groupVolume != null,
@@ -102,6 +107,7 @@ fun GroupSettings(
                             },
                             onStepDown = { playerAction(player.player.id, PlayerAction.GroupVolumeDown) },
                             onStepUp = { playerAction(player.player.id, PlayerAction.GroupVolumeUp) },
+                            throttleMs = groupThrottleMs,
                         )
                     }
                 }
@@ -146,6 +152,7 @@ fun GroupSettings(
                                 },
                                 onStepDown = { playerAction(player.player.id, PlayerAction.GroupVolumeDown) },
                                 onStepUp = { playerAction(player.player.id, PlayerAction.GroupVolumeUp) },
+                                throttleMs = groupThrottleMs,
                             )
                         }
                     } else {
@@ -175,7 +182,7 @@ fun GroupSettings(
             }
 
             val sortedChildren = player.childrenBinds.sortedByDescending { it.isBound }
-            items(sortedChildren, key = { "${it.id}_${it.volume}" }) { bindInfo ->
+            items(sortedChildren, key = { it.id }) { bindInfo ->
                 GroupPlayerItemCard(
                     background = if (bindInfo.isBound) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
                 ) {
@@ -360,8 +367,19 @@ private fun VolumeRow(
     onVolumeSet: (Float) -> Unit,
     onStepDown: () -> Unit,
     onStepUp: () -> Unit,
+    throttleMs: Long = LiveVolumeSender.LIVE_SEND_THROTTLE_MS,
 ) {
-    var currentVolume by remember(volume) { mutableStateOf(volume ?: 0f) }
+    var currentVolume by remember { mutableStateOf(volume ?: 0f) }
+    // The server echoes each live send; applying it mid-drag would yank the thumb back.
+    var dragging by remember { mutableStateOf(false) }
+    LaunchedEffect(volume) {
+        if (!dragging) volume?.let { currentVolume = it }
+    }
+    val scope = rememberCoroutineScope()
+    val currentOnVolumeSet by rememberUpdatedState(onVolumeSet)
+    val sender = remember(throttleMs) {
+        LiveVolumeSender(scope, throttleMs) { currentOnVolumeSet(it.toFloat()) }
+    }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -390,9 +408,19 @@ private fun VolumeRow(
         }
         val onVolumeChange = rememberVolumeChange(
             volume = { currentVolume },
-            set = { currentVolume = it },
+            set = {
+                if (!dragging) {
+                    dragging = true
+                    sender.start()
+                }
+                currentVolume = it
+                sender.send(it)
+            },
         )
-        val onVolumeChangeFinished = { onVolumeSet(currentVolume) }
+        val onVolumeChangeFinished = {
+            dragging = false
+            sender.finish(currentVolume)
+        }
         VolumeSliderBox(
             modifier = Modifier.weight(1f),
             enabled = enabled,
