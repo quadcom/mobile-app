@@ -27,13 +27,18 @@ class LiveVolumeSenderTest {
     fun rapidChangesGiveOneTrailingSendWithLatestValue() = runTest {
         val s = sender()
         s.send(10f)
-        advanceTimeBy(20); s.send(20f)
-        advanceTimeBy(20); s.send(30f)
-        advanceTimeBy(20); s.send(40f)
+        advanceTimeBy(20)
+        s.send(20f)
+        advanceTimeBy(20)
+        s.send(30f)
+        advanceTimeBy(20)
+        s.send(40f)
         assertEquals(listOf(10), sent)
-        advanceTimeBy(40); runCurrent()
+        advanceTimeBy(40)
+        runCurrent()
         assertEquals(listOf(10, 40), sent)
-        advanceTimeBy(500); runCurrent()
+        advanceTimeBy(500)
+        runCurrent()
         assertEquals(listOf(10, 40), sent)
     }
 
@@ -57,9 +62,12 @@ class LiveVolumeSenderTest {
     fun sameValueAsLastSentSendsNothingAndCancelsPending() = runTest {
         val s = sender()
         s.send(10f)
-        advanceTimeBy(20); s.send(20f)
-        advanceTimeBy(20); s.send(10f)
-        advanceTimeBy(500); runCurrent()
+        advanceTimeBy(20)
+        s.send(20f)
+        advanceTimeBy(20)
+        s.send(10f)
+        advanceTimeBy(500)
+        runCurrent()
         assertEquals(listOf(10), sent)
     }
 
@@ -67,9 +75,11 @@ class LiveVolumeSenderTest {
     fun finishCancelsPendingAndSkipsDuplicate() = runTest {
         val s = sender()
         s.send(10f)
-        advanceTimeBy(20); s.send(20f)
+        advanceTimeBy(20)
+        s.send(20f)
         s.finish(10f)
-        advanceTimeBy(500); runCurrent()
+        advanceTimeBy(500)
+        runCurrent()
         assertEquals(listOf(10), sent)
     }
 
@@ -77,9 +87,11 @@ class LiveVolumeSenderTest {
     fun finishSendsNewValue() = runTest {
         val s = sender()
         s.send(10f)
-        advanceTimeBy(20); s.send(20f)
+        advanceTimeBy(20)
+        s.send(20f)
         s.finish(30f)
-        advanceTimeBy(500); runCurrent()
+        advanceTimeBy(500)
+        runCurrent()
         assertEquals(listOf(10, 30), sent)
     }
 
