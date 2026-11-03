@@ -102,7 +102,7 @@ fun SpeakerListSheet(
         Column(
             Modifier.sheetBackdrop(
                 LocalSheetHazeState.current,
-                MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.72f),
+                MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = SHEET_TINT_ALPHA),
             ),
         ) {
             Row(
