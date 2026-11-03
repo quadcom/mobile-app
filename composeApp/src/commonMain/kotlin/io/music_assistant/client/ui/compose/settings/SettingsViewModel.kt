@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.music_assistant.client.api.ConnectionInfo
 import io.music_assistant.client.api.ServiceClient
+import io.music_assistant.client.data.location.HomeAssistantLocationSource
 import io.music_assistant.client.logging.InMemoryLogWriter
 import io.music_assistant.client.logging.LogSharer
 import io.music_assistant.client.settings.ConnectionHistoryEntry
@@ -30,7 +31,14 @@ class SettingsViewModel(
     private val logSharer: LogSharer,
     private val localNetworkPermissionGate: LocalNetworkPermissionGate,
     val appVersion: AppVersion,
+    private val haLocations: HomeAssistantLocationSource,
 ) : ViewModel() {
+    val haAddress = settings.haAddress
+    val haToken = settings.haToken
+    val haStatus = haLocations.status
+
+    fun saveHomeAssistant(address: String, token: String) = haLocations.saveCredentials(address, token)
+
     val savedConnectionInfo = settings.connectionInfo
     val sessionState = apiClient.sessionState
     val localNetworkOnboardingResources: LocalNetworkOnboardingResources? =

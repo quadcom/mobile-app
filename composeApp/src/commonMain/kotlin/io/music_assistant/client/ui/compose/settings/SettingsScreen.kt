@@ -78,6 +78,7 @@ import io.music_assistant.client.ui.compose.common.UnsupportedInstallCard
 import io.music_assistant.client.ui.compose.common.clearFocusOnScroll
 import io.music_assistant.client.ui.compose.common.toDisplayString
 import io.music_assistant.client.ui.compose.nav.TopBarLayout
+import io.music_assistant.client.ui.compose.settings.sections.HomeAssistantSection
 import io.music_assistant.client.ui.compose.settings.sections.SendspinSettingsSection
 import io.music_assistant.client.ui.theme.ThemeSetting
 import io.music_assistant.client.ui.theme.ThemeViewModel
@@ -392,6 +393,17 @@ fun SettingsScreen(goHome: () -> Unit, exitApp: () -> Unit) {
                         }
                     }
                 }
+
+                // Home Assistant link: independent of the Music Assistant connection, so always visible
+                val haAddress by viewModel.haAddress.collectAsStateWithLifecycle()
+                val haToken by viewModel.haToken.collectAsStateWithLifecycle()
+                val haStatus by viewModel.haStatus.collectAsStateWithLifecycle()
+                HomeAssistantSection(
+                    savedAddress = haAddress,
+                    savedToken = haToken,
+                    status = haStatus,
+                    onSave = viewModel::saveHomeAssistant,
+                )
 
                 // Misc settings - always visible
                 val shareLogsTitle = stringResource(Res.string.settings_share_logs)

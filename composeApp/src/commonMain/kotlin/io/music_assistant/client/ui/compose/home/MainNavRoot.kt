@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -47,6 +48,8 @@ import androidx.navigation3.scene.Scene
 import androidx.navigation3.ui.defaultPopTransitionSpec
 import androidx.navigation3.ui.defaultTransitionSpec
 import androidx.savedstate.serialization.SavedStateConfiguration
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import io.music_assistant.client.api.DeepLinkBus
 import io.music_assistant.client.api.DeepLinkDestination
 import io.music_assistant.client.api.ErrorMessageBus
@@ -79,12 +82,13 @@ import io.music_assistant.client.ui.compose.common.viewmodel.ActionsViewModel
 import io.music_assistant.client.ui.compose.home.players.DspSettingsViewModel
 import io.music_assistant.client.ui.compose.home.players.PlayersPager
 import io.music_assistant.client.ui.compose.home.players.QueueDjViewModel
-import io.music_assistant.client.ui.compose.home.players.SelectPlayerSheet
 import io.music_assistant.client.ui.compose.home.players.contentDescription
 import io.music_assistant.client.ui.compose.home.players.iconRes
 import io.music_assistant.client.ui.compose.home.players.label
 import io.music_assistant.client.ui.compose.home.players.rememberHideUnavailablePlayers
 import io.music_assistant.client.ui.compose.home.players.rememberToggleHideUnavailablePlayers
+import io.music_assistant.client.ui.compose.home.players.speakers.LocalSheetHazeState
+import io.music_assistant.client.ui.compose.home.players.speakers.SpeakerListSheet
 import io.music_assistant.client.ui.compose.item.ItemDetailsScreen
 import io.music_assistant.client.ui.compose.item.ItemDetailsViewModel
 import io.music_assistant.client.ui.compose.item.ItemListScreen
@@ -271,36 +275,38 @@ fun MainNavigationRoot(
     val rootScreenEditing = homeScreenState.value?.editMode == true
 
     var showPlayerSelection by remember { mutableStateOf(false) }
+    // Kept here so the order of the speaker list's top rows survives closing the sheet.
+    var speakerTopOrder by remember { mutableStateOf<List<String>>(emptyList()) }
+    // The screen is captured here so the speaker sheets can blur it behind themselves.
+    val sheetHazeState = rememberHazeState()
     playersState.let {
         if (it is HomeScreenViewModel.PlayersState.Data) {
             val selectedPlayer = it.selectedPlayer
             if (selectedPlayer != null) {
                 if (showPlayerSelection) {
-                    val leaderLeaveSupported by homeScreenViewModel.leaderLeaveSupported
-                        .collectAsStateWithLifecycle()
-
-                    SelectPlayerSheet(
+                    CompositionLocalProvider(LocalSheetHazeState provides sheetHazeState) {
+                    SpeakerListSheet(
                         selectedPlayer = selectedPlayer,
                         players = it.playerData,
+                        topOrder = speakerTopOrder,
+                        onTopOrderChange = { order -> speakerTopOrder = order },
                         onDismissRequest = { showPlayerSelection = false },
                         onMoveToPlayer = { id: String ->
                             it.playerData.find { playerData -> playerData.player.id == id }?.player?.let { player ->
                                 homeScreenViewModel.selectPlayer(player)
                             }
                         },
-                        onReorder = homeScreenViewModel::onPlayersSortChanged,
                         onPlayerAction = homeScreenViewModel::playerAction,
                         hideUnavailable = rememberHideUnavailablePlayers(),
                         onToggleHideUnavailable = rememberToggleHideUnavailablePlayers(),
-                        onAdjustPlaybackDelay = homeScreenViewModel::adjustSendspinStaticDelayMs,
-                        canLeaveGroup = leaderLeaveSupported,
                     )
+                    }
                 }
             }
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().hazeSource(sheetHazeState)) {
         val libraryCategories by libraryCategoriesViewModel.state.collectAsStateWithLifecycle()
         val navigationItems = navigationItems(
             multiBackStack = multiBackStack,

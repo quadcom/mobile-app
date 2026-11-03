@@ -5,6 +5,7 @@
 - **Material3** - Design system
 - **Material Icons Extended** - Icon set
 - **FontAwesome / Tabler Icons** - Additional icons
+- **Haze 2.0.0** (`haze`, `haze-blur`) - Background blur behind the speaker sheets. The sheets sit in their own window, so they blur captured sources (`HazeInput.Sources`) from the `hazeSource` on `MainNavRoot`'s root, not the window backdrop. 2.0.0 matches Compose Multiplatform 1.12.0
 
 ## Networking
 - **Ktor** - HTTP client + WebSocket (CIO/Darwin/Java engines)

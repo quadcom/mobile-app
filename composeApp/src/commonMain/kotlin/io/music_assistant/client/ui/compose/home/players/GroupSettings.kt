@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -359,7 +360,7 @@ private fun PlaybackDelayButtons(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun VolumeRow(
+internal fun VolumeRow(
     volume: Float?,
     isMuted: Boolean?,
     enabled: Boolean,
@@ -368,7 +369,17 @@ private fun VolumeRow(
     onStepDown: () -> Unit,
     onStepUp: () -> Unit,
     throttleMs: Long = LiveVolumeSender.LIVE_SEND_THROTTLE_MS,
+    // Null keeps the theme look; the group pop-up passes the player's artwork colours.
+    thumbColor: Color? = null,
+    activeTrackColor: Color? = null,
+    inactiveTrackColor: Color? = null,
+    muteIconTint: Color? = null,
 ) {
+    val defaultTrackColors = SliderDefaults.colors()
+    val trackColors = defaultTrackColors.copy(
+        activeTrackColor = activeTrackColor ?: defaultTrackColors.activeTrackColor,
+        inactiveTrackColor = inactiveTrackColor ?: defaultTrackColors.inactiveTrackColor,
+    )
     var currentVolume by remember { mutableStateOf(volume ?: 0f) }
     // The server echoes each live send; applying it mid-drag would yank the thumb back.
     var dragging by remember { mutableStateOf(false) }
@@ -397,6 +408,7 @@ private fun VolumeRow(
                 } else {
                     VolumeIcon
                 },
+                tint = muteIconTint ?: LocalContentColor.current,
                 contentDescription = if (isMuted) {
                     stringResource(
                         Res.string.cd_unmute,
@@ -442,12 +454,13 @@ private fun VolumeRow(
                         interactionSource = remember { MutableInteractionSource() },
                         thumbSize = DpSize(16.dp, 16.dp),
                         colors = SliderDefaults.colors()
-                            .copy(thumbColor = MaterialTheme.colorScheme.secondary),
+                            .copy(thumbColor = thumbColor ?: MaterialTheme.colorScheme.secondary),
                     )
                 },
                 track = { sliderState ->
                     SliderDefaults.Track(
                         sliderState = sliderState,
+                        colors = trackColors,
                         thumbTrackGapSize = 0.dp,
                         trackInsideCornerSize = 0.dp,
                         drawStopIndicator = null,
