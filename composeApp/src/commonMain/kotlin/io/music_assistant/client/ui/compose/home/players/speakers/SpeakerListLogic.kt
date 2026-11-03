@@ -40,14 +40,15 @@ internal fun boundLeaders(players: List<PlayerData>): Map<String, String> {
     return result
 }
 
-private fun PlayerData.leadsMembers(): Boolean =
-    player.groupMembers?.any { it != playerId } == true
-
-/** Ids of the rooms that get a row: a leader, or a room playing on its own and not bound. */
+/**
+ * Ids of the rooms that get a row: rooms actually playing (or announcing) and not bound into another
+ * room's group. A paused group does not count (Adrian, 2026-11-03: "why is the dining room at the
+ * top? Nothing is playing there").
+ */
 internal fun playingRoomIds(players: List<PlayerData>, bound: Map<String, String>): List<String> =
     players
         .filter { it.playerId !in bound }
-        .filter { it.player.isPlaying || it.player.isAnnouncing || it.leadsMembers() }
+        .filter { it.player.isPlaying || it.player.isAnnouncing }
         .map { it.playerId }
 
 /**
@@ -125,7 +126,7 @@ internal fun editorTag(
     val ownerId = boundLeaders(players)[room.playerId]
     return when {
         ownerId == leader.playerId -> EditorTag.Named(leader.player.name)
-        ownerId == null && (room.player.isPlaying || room.leadsMembers()) -> EditorTag.Playing
+        ownerId == null && room.player.isPlaying -> EditorTag.Playing
         ownerId != null -> players.byId(ownerId)?.let { EditorTag.Named(it.player.name) } ?: EditorTag.None
         else -> EditorTag.None
     }
