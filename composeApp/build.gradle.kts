@@ -135,6 +135,8 @@ kotlin {
             implementation(libs.icons.tabler)
             implementation(libs.settings.multiplatform)
             implementation(libs.reorderable)
+            implementation(libs.haze)
+            implementation(libs.haze.blur)
 
             implementation(libs.kermit)
 

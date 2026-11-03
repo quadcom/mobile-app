@@ -123,6 +123,32 @@ class SettingsRepository(
         }
     }
 
+    // Home Assistant link for speaker floors. Address and token both live in secrets: the token
+    // is a credential, and the address names a private host. The cached locations ride along
+    // so the speaker list has floors straight after an app start.
+    private val _haAddress = MutableStateFlow(secrets.getString("ha_address", ""))
+    val haAddress = _haAddress.asStateFlow()
+
+    fun setHaAddress(address: String) {
+        secrets.putString("ha_address", address)
+        _haAddress.update { address }
+    }
+
+    private val _haToken = MutableStateFlow(secrets.getString("ha_token", ""))
+    val haToken = _haToken.asStateFlow()
+
+    fun setHaToken(token: String) {
+        secrets.putString("ha_token", token)
+        _haToken.update { token }
+    }
+
+    /** Last good player-locations map as JSON; empty when none is cached. */
+    var haLocationsJson: String
+        get() = secrets.getString("ha_locations", "")
+        set(value) {
+            secrets.putString("ha_locations", value)
+        }
+
     /**
      * Get the authentication token of a specific server.
      *

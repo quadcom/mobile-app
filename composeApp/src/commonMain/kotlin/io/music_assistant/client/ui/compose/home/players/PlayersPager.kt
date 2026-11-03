@@ -71,7 +71,11 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.input.pointer.util.addPointerInputChange
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.DpSize
@@ -145,6 +149,7 @@ import musicassistantclient.composeapp.generated.resources.player_power_on
 import musicassistantclient.composeapp.generated.resources.players_dsp_settings
 import musicassistantclient.composeapp.generated.resources.players_loading
 import musicassistantclient.composeapp.generated.resources.players_none_available
+import musicassistantclient.composeapp.generated.resources.players_show_group_volumes
 import musicassistantclient.composeapp.generated.resources.queue_clear
 import musicassistantclient.composeapp.generated.resources.queue_no_other_players
 import musicassistantclient.composeapp.generated.resources.queue_transfer
@@ -413,6 +418,7 @@ fun PlayersPager(
                                     overlayAvailable && player.queueInfo?.overlay != null
                                 },
                                 playerAction = playerAction1,
+                                playerActionById = { id, action -> homeScreenViewModel.playerAction(id, action) },
                                 onAddToPlaylist = onAddToPlaylist.takeIf { grantedScopes.canEditLibrary },
                                 onStartEndlessMix = onStartEndlessMix,
                                 onFavoriteChange = actionsViewModel::onFavoriteChange
@@ -514,6 +520,8 @@ private fun ExpandedPlayerPage(
     onAnnounceButton: (() -> Unit)?,
     onAmbientSoundButton: (() -> Unit)?,
     playerAction: (PlayerData, PlayerAction) -> Unit,
+    // Targets one speaker of the group; the group volume pop-up drives each member by its id.
+    playerActionById: (String, PlayerAction) -> Unit = { _, _ -> },
     onAddToPlaylist: ((AppMediaItem) -> Unit)? = null,
     onStartEndlessMix: ((AppMediaItem) -> Unit)? = null,
     // Null hides the heart: the user cannot edit the library.
@@ -749,8 +757,22 @@ private fun ExpandedPlayerPage(
                         )
                         val isGroupBound = player.childrenBinds.any { it.isBound }
                         val isGroupForGesture by rememberUpdatedState(isGroupBound)
+                        val localPlayerId = allPlayers.firstOrNull { it.isLocal }?.playerId
+                        // A tap opens the per-speaker pop-up only when it has speakers to show.
+                        val opensGroupPopup = isGroupBound && groupVolumeMembers(player, localPlayerId).isNotEmpty()
+                        var showGroupPopup by remember { mutableStateOf(false) }
+                        var barBottomPx by remember { mutableStateOf<Int?>(null) }
+                        if (!opensGroupPopup && showGroupPopup) showGroupPopup = false
+                        // Never place the card at a guessed spot: no measured bar, no pop-up.
+                        val openGroupPopup: () -> Unit = { if (barBottomPx != null) showGroupPopup = true }
+                        val showGroupVolumesLabel = stringResource(Res.string.players_show_group_volumes)
                         Row(
-                            modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .onGloballyPositioned {
+                                    barBottomPx = (it.positionInWindow().y + it.size.height).roundToInt()
+                                }
+                                .padding(horizontal = 32.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
@@ -783,9 +805,21 @@ private fun ExpandedPlayerPage(
                                 tint = controlTint,
                             )
                             VolumeSliderBox(
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.weight(1f).then(
+                                    if (opensGroupPopup) {
+                                        Modifier.semantics {
+                                            onClick(label = showGroupVolumesLabel) {
+                                                openGroupPopup()
+                                                true
+                                            }
+                                        }
+                                    } else {
+                                        Modifier
+                                    },
+                                ),
                                 volume = { currentVolume },
                                 onStepDown = {
+                                    if (opensGroupPopup) return@VolumeSliderBox openGroupPopup()
                                     playerAction(
                                         player,
                                         if (isGroupForGesture) {
@@ -796,6 +830,7 @@ private fun ExpandedPlayerPage(
                                     )
                                 },
                                 onStepUp = {
+                                    if (opensGroupPopup) return@VolumeSliderBox openGroupPopup()
                                     playerAction(
                                         player,
                                         if (isGroupForGesture) {
@@ -848,6 +883,18 @@ private fun ExpandedPlayerPage(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = controlTint,
                             )
+                        }
+                        if (showGroupPopup && opensGroupPopup) {
+                            barBottomPx?.let { bottom ->
+                                GroupVolumePopup(
+                                    player = player,
+                                    localPlayerId = localPlayerId,
+                                    barBottomPx = bottom,
+                                    tint = controlTint,
+                                    playerAction = playerActionById,
+                                    onDismiss = { showGroupPopup = false },
+                                )
+                            }
                         }
                     }
                 }
