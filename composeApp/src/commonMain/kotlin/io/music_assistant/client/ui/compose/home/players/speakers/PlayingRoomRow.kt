@@ -82,7 +82,7 @@ internal fun PlayingRoomRow(
                 .align(Alignment.TopStart)
                 .offset(x = (-10).dp, y = (-8).dp)
                 .size(58.dp),
-            tint = colors.onSurfaceVariant.copy(alpha = 0.12f),
+            tint = colors.onSurfaceVariant.copy(alpha = BACKGROUND_ICON_ALPHA),
         )
 
         Column(
