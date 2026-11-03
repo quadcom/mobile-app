@@ -238,7 +238,9 @@ internal fun GroupVolumePopup(
                                 inactiveTrackColor = inactiveTint,
                                 muteIconTint = tint,
                                 // The group slider sends to every member, so it sends less often.
-                                throttleMs = LiveVolumeSender.groupThrottleMs(player.childrenBinds.count { it.isBound }),
+                                throttleMs = LiveVolumeSender.groupThrottleMs(
+                                    player.childrenBinds.count { it.isBound },
+                                ),
                             )
                         }
                     }
