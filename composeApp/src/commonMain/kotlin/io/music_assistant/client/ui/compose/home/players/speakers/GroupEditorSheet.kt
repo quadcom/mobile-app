@@ -62,6 +62,8 @@ internal fun GroupEditorSheet(
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         dragHandle = null,
         containerColor = Color.Transparent,
+        // A transparent container gives no content colour of its own (it fell back to black).
+        contentColor = MaterialTheme.colorScheme.onSurface,
         modifier = Modifier.fillMaxHeight(),
     ) {
         Column(
