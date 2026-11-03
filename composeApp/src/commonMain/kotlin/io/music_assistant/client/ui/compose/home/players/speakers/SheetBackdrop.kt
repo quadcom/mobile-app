@@ -25,3 +25,6 @@ val LocalSheetHazeState = staticCompositionLocalOf<HazeState?> { null }
 internal fun Modifier.sheetBackdrop(hazeState: HazeState?, tint: Color): Modifier =
     (hazeState?.let { hazeBlur(input = HazeInput.Sources(it), style = HazeBlurStyle { blurRadius(20.dp) }) } ?: this)
         .background(tint)
+
+/** How solid the sheets' tint is over the blur (Adrian, 2026-11-03: 72% read too light on the phone). */
+internal const val SHEET_TINT_ALPHA = 0.88f

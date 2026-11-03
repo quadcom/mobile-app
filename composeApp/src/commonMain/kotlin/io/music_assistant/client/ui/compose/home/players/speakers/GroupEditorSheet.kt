@@ -72,7 +72,7 @@ internal fun GroupEditorSheet(
                 .fillMaxHeight()
                 .sheetBackdrop(
                     LocalSheetHazeState.current,
-                    MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.72f),
+                    MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = SHEET_TINT_ALPHA),
                 ),
         ) {
             Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp)) {
