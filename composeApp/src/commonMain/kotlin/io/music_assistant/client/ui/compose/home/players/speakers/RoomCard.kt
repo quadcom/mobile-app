@@ -12,17 +12,22 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -35,6 +40,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import io.music_assistant.client.data.model.client.PlayerData
 import io.music_assistant.client.ui.compose.home.players.iconRes
@@ -46,6 +52,9 @@ internal val ActiveFill = Color(0xFF183C4A)
 internal val CardShape = RoundedCornerShape(12.dp)
 
 private const val FADE_MS = 200
+
+// Faint enough that a name drawn over the icon stays readable on a bright phone screen.
+internal const val BACKGROUND_ICON_ALPHA = 0.08f
 
 /**
  * A 78dp square room card. [highlighted] is the group editor's "in this group" look (fill, border
@@ -80,11 +89,6 @@ internal fun RoomCard(
     val fullName = player.player.name
     // Names break at every space, so "Dining room" is always two lines.
     val shownName = fullName.replace(' ', '\n')
-    val nameShift = when {
-        dimmed -> 6.dp
-        tag != null -> 5.dp
-        else -> 0.dp
-    }
 
     Box(
         modifier = modifier
@@ -103,33 +107,45 @@ internal fun RoomCard(
                 .offset(x = (-10).dp, y = (-8).dp)
                 .size(58.dp)
                 .alpha(contentAlpha),
-            tint = colors.onSurfaceVariant.copy(alpha = 0.12f),
+            tint = colors.onSurfaceVariant.copy(alpha = BACKGROUND_ICON_ALPHA),
         )
-        if (tag != null) {
-            Text(
-                text = tag,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 2.dp, start = 4.dp, end = 4.dp),
-                style = MaterialTheme.typography.labelSmall,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                color = colors.onSurface.copy(alpha = tagAlpha),
-                textAlign = TextAlign.Center,
-            )
+        // The tag gets its own strip at the top and the name the space below it, so the two never
+        // overlap. Both shrink to fit instead of wrapping mid-word: with a large system font
+        // (measured 1.15 on Adrian's phone) a 14sp "Greatroom" is wider than the card.
+        Column(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 3.dp, vertical = 3.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            if (tag != null) {
+                BasicText(
+                    text = tag,
+                    modifier = Modifier.fillMaxWidth().height(14.dp),
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Medium,
+                        color = colors.onSurface.copy(alpha = tagAlpha),
+                        textAlign = TextAlign.Center,
+                    ),
+                    maxLines = 1,
+                    autoSize = TextAutoSize.StepBased(minFontSize = 7.sp, maxFontSize = 11.sp, stepSize = 0.5.sp),
+                )
+            }
+            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                BasicText(
+                    text = shownName,
+                    modifier = Modifier
+                        .alpha(contentAlpha)
+                        .semantics { contentDescription = fullName },
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = colors.onSurface,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 1.2.em,
+                    ),
+                    // One line per word: a word that would wrap overflows instead, so the size steps down.
+                    maxLines = shownName.count { it == '\n' } + 1,
+                    autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = 14.sp, stepSize = 0.5.sp),
+                )
+            }
         }
-        Text(
-            text = shownName,
-            modifier = Modifier
-                .offset(y = nameShift)
-                .padding(horizontal = 2.dp)
-                .alpha(contentAlpha)
-                .semantics { contentDescription = fullName },
-            style = MaterialTheme.typography.bodyMedium,
-            fontSize = 14.sp,
-            lineHeight = 17.sp,
-            textAlign = TextAlign.Center,
-        )
         Icon(
             imageVector = Icons.Default.CheckCircle,
             contentDescription = null,
