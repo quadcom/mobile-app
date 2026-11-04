@@ -29,7 +29,10 @@ class PlayerFactory(
             // for a group. If the server adds a genuinely new group-like type we
             // can surface it explicitly once the mobile app learns about it.
             type = PlayerType.fromServer(type) ?: PlayerType.PLAYER,
-            isListed = enabled && (hidden != true) && (hideInUi != true),
+            // Only "always" hides here: the other conditions depend on live state the list
+            // would have to track, and a player hidden that way may be needed for announcements.
+            isListed = enabled && (hidden != true) && (hideInUi != true) &&
+                hidePlayerInUi?.contains("always") != true,
             isAvailable = available,
             needsSetup = needsSetup == true,
             canSetVolume = supportedFeatures.contains(PlayerFeature.VOLUME_SET),

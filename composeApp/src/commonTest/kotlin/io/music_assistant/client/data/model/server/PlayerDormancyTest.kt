@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
  * The server keeps a player it can no longer reach in the registry: it flips `available`
  * to false and sends a player update, then re-registers the player when the device comes
  * back. Deleting such a player makes a speaker vanish from the app while it is in stand-by
- * (issue #944), so only `enabled` / `hidden` / `hide_in_ui` may hide one. Everything else
+ * (issue #944), so only `enabled` / `hidden` / `hide_in_ui` / `hide_player_in_ui: ["always"]` may hide one. Everything else
  * folds into [io.music_assistant.client.data.model.client.Player.isPoweredOff], which
  * renders the player asleep and offers the power button.
  */
@@ -20,6 +20,19 @@ class PlayerDormancyTest {
     private val playerFactory = PlayerFactory(StubServiceClient())
 
     private fun player(json: String) = playerFactory.create(myJson.decodeFromString<ServerPlayer>(json))
+
+    @Test
+    fun `a player the server always hides is not listed`() {
+        val player = player("""{"player_id": "ap1", "available": true, "hide_player_in_ui": ["always"]}""")
+
+        assertFalse(player.isListed)
+    }
+
+    @Test
+    fun `a player hidden only under a condition stays listed`() {
+        assertTrue(player("""{"player_id": "ap1", "available": true, "hide_player_in_ui": ["when_off"]}""").isListed)
+        assertTrue(player("""{"player_id": "ap1", "available": true, "hide_player_in_ui": []}""").isListed)
+    }
 
     @Test
     fun `an unreachable player stays listed and reads as asleep`() {
