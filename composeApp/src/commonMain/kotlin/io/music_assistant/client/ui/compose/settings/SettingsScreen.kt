@@ -82,6 +82,7 @@ import io.music_assistant.client.ui.compose.settings.sections.HomeAssistantSecti
 import io.music_assistant.client.ui.compose.settings.sections.SendspinSettingsSection
 import io.music_assistant.client.ui.theme.ThemeSetting
 import io.music_assistant.client.ui.theme.ThemeViewModel
+import io.music_assistant.client.utils.AppUpdateCheck
 import io.music_assistant.client.utils.AppVersion
 import io.music_assistant.client.utils.DataConnectionState
 import io.music_assistant.client.utils.LocalNetworkOnboardingResources
@@ -106,6 +107,7 @@ import musicassistantclient.composeapp.generated.resources.settings_allow_landsc
 import musicassistantclient.composeapp.generated.resources.settings_allow_landscape_hint
 import musicassistantclient.composeapp.generated.resources.settings_app_documentation
 import musicassistantclient.composeapp.generated.resources.settings_app_version_info
+import musicassistantclient.composeapp.generated.resources.settings_check_for_updates
 import musicassistantclient.composeapp.generated.resources.settings_connect
 import musicassistantclient.composeapp.generated.resources.settings_connect_saved
 import musicassistantclient.composeapp.generated.resources.settings_connect_webrtc
@@ -142,6 +144,7 @@ import musicassistantclient.composeapp.generated.resources.settings_webrtc_descr
 import musicassistantclient.composeapp.generated.resources.settings_webrtc_disclaimer
 import musicassistantclient.composeapp.generated.resources.settings_webrtc_info
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.getKoin
 import org.koin.compose.viewmodel.koinViewModel
 import org.publicvalue.multiplatform.qrcode.CameraPosition
 import org.publicvalue.multiplatform.qrcode.CodeType
@@ -547,6 +550,17 @@ private fun AppVersionSection(appVersion: AppVersion) {
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.clickable { uriHandler.openUri("https://music-assistant.github.io/mobile-app/") },
         )
+        // Not bound on iOS, so the link only appears where the app can update itself.
+        val updateCheck = getKoin().getOrNull<AppUpdateCheck>()?.takeIf { it.available }
+        updateCheck?.let {
+            Spacer(modifier = Modifier.size(4.dp))
+            Text(
+                text = stringResource(Res.string.settings_check_for_updates),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.clickable { it.checkNow() },
+            )
+        }
     }
 }
 

@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">Music Assistant</string>
+    <string name="self_update_title">A new build is ready</string>
+    <string name="self_update_install">Install</string>
+    <string name="self_update_later">Later</string>
+    <string name="self_update_skip">Skip this build</string>
+    <string name="self_update_downloading">Downloading the new build</string>
+    <string name="self_update_close">Close</string>
+    <string name="self_update_ok">OK</string>
+    <string name="self_update_up_to_date">You have the latest build.</string>
 </resources>

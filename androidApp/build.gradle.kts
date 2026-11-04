@@ -115,6 +115,10 @@ dependencies {
     implementation(libs.androidx.car.app)
     implementation(libs.coil)
     implementation(libs.kermit)
+    // The self-updater (update/AppUpdater.kt) talks to GitHub through the shared HttpClientFactory.
+    implementation(libs.ktor.client.core)
+    // Its dialog is drawn here, beside MainActivity, so this module needs Material3 too.
+    implementation(libs.material)
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 

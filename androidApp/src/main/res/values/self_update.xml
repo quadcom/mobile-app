@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Off in normal builds so the app never contacts GitHub; the release build overlays true. -->
+    <bool name="self_update_enabled">false</bool>
+    <string name="self_update_repo" translatable="false">quadcom/mobile-app</string>
+</resources>

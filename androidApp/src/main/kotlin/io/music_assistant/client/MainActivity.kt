@@ -20,6 +20,8 @@ import io.music_assistant.client.input.VolumeButtonService
 import io.music_assistant.client.services.MainMediaPlaybackService
 import io.music_assistant.client.settings.SettingsRepository
 import io.music_assistant.client.ui.compose.App
+import io.music_assistant.client.update.AppUpdater
+import io.music_assistant.client.update.SelfUpdateDialog
 import org.koin.android.ext.android.inject
 
 class MainActivity : ComponentActivity() {
@@ -28,6 +30,7 @@ class MainActivity : ComponentActivity() {
     private val deepLinkBus: DeepLinkBus by inject()
     private val volumeButtonService: VolumeButtonService by inject()
     private val settings: SettingsRepository by inject()
+    private val appUpdater: AppUpdater by inject()
     private val oauthHandler: OAuthHandler by lazy {
         CustomTabsOAuthHandler(this)
     }
@@ -75,7 +78,9 @@ class MainActivity : ComponentActivity() {
             }
         setContent {
             App()
+            if (appUpdater.enabled) SelfUpdateDialog(appUpdater, this@MainActivity)
         }
+        appUpdater.checkOnStart()
     }
 
     private fun isCompactDevice() =
