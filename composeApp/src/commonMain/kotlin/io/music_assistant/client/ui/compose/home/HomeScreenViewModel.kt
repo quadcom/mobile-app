@@ -16,6 +16,7 @@ import io.music_assistant.client.data.model.client.items.Genre
 import io.music_assistant.client.data.model.client.items.PodcastEpisode
 import io.music_assistant.client.data.model.client.items.RecommendationFolder
 import io.music_assistant.client.data.model.client.items.Track
+import io.music_assistant.client.data.model.client.pagePlayers
 import io.music_assistant.client.data.model.server.ServerUser
 import io.music_assistant.client.data.model.server.events.PlaylogUpdatedEvent
 import io.music_assistant.client.data.model.server.supportsLeaderLeave
@@ -473,9 +474,9 @@ class HomeScreenViewModel(
             // Don't update terminal states (Disconnected, NoAuth, NoServer)
             val currentState = _playersState.value
             if (currentState is PlayersState.Loading || currentState is PlayersState.Data) {
-                // The pager shows only players the app can act on; the player list shows all.
+                // The pager shows only group leaders the app can act on; the player list shows all.
                 fun dataOf(all: List<PlayerData>): PlayersState.Data {
-                    val pageable = all.filter { it.player.isSelectable }
+                    val pageable = all.pagePlayers()
                     return PlayersState.Data(
                         playerData = pageable,
                         selectedPlayerIndex = pageable.indexOfPlayer(selectedId),

@@ -9,6 +9,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -113,6 +114,7 @@ import io.music_assistant.client.ui.compose.search.SearchViewModel
 import io.music_assistant.client.utils.DataConnectionState
 import io.music_assistant.client.utils.SessionState
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
@@ -171,21 +173,29 @@ fun MainNavigationRoot(
         pageCount = { data?.playerData?.size ?: 0 },
     )
 
-    // Bidirectional pager <-> selection sync
-    // Selection→pager runs first (data layer priority), then pager→selection watches user swipes
-    LaunchedEffect(playerPagerState, playersState) {
-        val currentData = playersState as? HomeScreenViewModel.PlayersState.Data
-            ?: return@LaunchedEffect
-        val target = currentData.selectedPlayerIndex ?: return@LaunchedEffect
-        if (!playerPagerState.isScrollInProgress) {
-            playerPagerState.animateScrollToPage(target)
+    // Bidirectional pager <-> selection sync.
+    // Keyed on the selection and the page ids only: keyed on the whole state, every player update
+    // (elapsed time, volume) restarted it mid-scroll, and the restart wrote the old page back as the
+    // selection, so picking a room from the list or "tap to view" did nothing (PLAN_MMA_05).
+    val latestData by rememberUpdatedState(data)
+    val pageIds = data?.playerData?.map { it.playerId }
+    LaunchedEffect(playerPagerState, data?.selectedPlayerIndex, pageIds) {
+        latestData?.selectedPlayerIndex?.let { playerPagerState.animateScrollToPage(it) }
+    }
+    // Pager→selection: only a page the user swiped to is a choice. A settle that follows the
+    // scroll above is not, or the resolver's fallback would be persisted as the user's selection.
+    LaunchedEffect(playerPagerState) {
+        var swiped = false
+        launch {
+            playerPagerState.interactionSource.interactions.collect {
+                if (it is DragInteraction.Start) swiped = true
+            }
         }
-
         snapshotFlow { playerPagerState.settledPage }.collect { currentPage ->
+            if (!swiped) return@collect
+            swiped = false
+            val currentData = latestData ?: return@collect
             currentData.playerData.getOrNull(currentPage)
-                // Only a swipe to another player is a user choice. Re-writing the page the
-                // scroll above just landed on would persist the resolver's fallback (first
-                // player while the chosen one is briefly missing) as the user's selection.
                 ?.takeIf { it.playerId != currentData.selectedPlayer?.playerId }
                 ?.let { playerData -> homeScreenViewModel.selectPlayer(playerData.player) }
         }
@@ -288,12 +298,14 @@ fun MainNavigationRoot(
                     CompositionLocalProvider(LocalSheetHazeState provides sheetHazeState) {
                     SpeakerListSheet(
                         selectedPlayer = selectedPlayer,
-                        players = it.playerData,
+                        // Every listed room, not just the pages: grouped and unreachable rooms
+                        // show greyed in the list, and picking a grouped one shows its group.
+                        players = it.allPlayerData,
                         topOrder = speakerTopOrder,
                         onTopOrderChange = { order -> speakerTopOrder = order },
                         onDismissRequest = { showPlayerSelection = false },
                         onMoveToPlayer = { id: String ->
-                            it.playerData.find { playerData -> playerData.player.id == id }?.player?.let { player ->
+                            it.allPlayerData.find { playerData -> playerData.player.id == id }?.player?.let { player ->
                                 homeScreenViewModel.selectPlayer(player)
                             }
                         },

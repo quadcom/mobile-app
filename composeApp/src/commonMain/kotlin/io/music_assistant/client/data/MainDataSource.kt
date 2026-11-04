@@ -26,6 +26,8 @@ import io.music_assistant.client.data.model.client.items.LongFormSeekDefaults
 import io.music_assistant.client.data.model.client.items.PlayableItem
 import io.music_assistant.client.data.model.client.items.Track
 import io.music_assistant.client.data.model.client.items.image
+import io.music_assistant.client.data.model.client.pageLeaders
+import io.music_assistant.client.data.model.client.pagePlayers
 import io.music_assistant.client.data.model.server.AI_RADIO_DOMAIN
 import io.music_assistant.client.data.model.server.AI_RADIO_QUEUE_DJ_SCOPES
 import io.music_assistant.client.data.model.server.AI_RADIO_STATIONS_SCOPES
@@ -343,12 +345,11 @@ class MainDataSource(
             _playersData,
             _userSelectedPlayerId,
         ) { playersDataState, user ->
-            val visibleIds = (playersDataState as? DataState.Data)
-                ?.data?.filter { it.player.isSelectable }?.map { it.playerId }
-                .orEmpty()
+            val all = (playersDataState as? DataState.Data)?.data.orEmpty()
             resolveSelectedPlayerId(
-                visiblePlayerIds = visibleIds,
+                visiblePlayerIds = all.pagePlayers().map { it.playerId },
                 userChoice = user,
+                leaderOf = all.pageLeaders(),
             )
         }.stateIn(this, SharingStarted.Eagerly, settings.lastSelectedPlayerId.value)
 
@@ -1850,8 +1851,12 @@ class MainDataSource(
         internal fun resolveSelectedPlayerId(
             visiblePlayerIds: List<String>,
             userChoice: String?,
+            leaderOf: Map<String, String> = emptyMap(),
         ): String? {
-            if (userChoice != null && userChoice in visiblePlayerIds) return userChoice
+            // A grouped room has no page of its own, so it resolves to its leader. The user's
+            // choice itself is kept, so the room comes back when the group breaks up.
+            val choice = userChoice?.let { leaderOf[it] ?: it }
+            if (choice != null && choice in visiblePlayerIds) return choice
             return visiblePlayerIds.firstOrNull()
         }
     }
