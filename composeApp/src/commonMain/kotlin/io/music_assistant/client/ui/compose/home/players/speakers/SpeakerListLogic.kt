@@ -131,3 +131,33 @@ internal fun editorTag(
         else -> EditorTag.None
     }
 }
+
+/** What the button on a floor heading in the group editor does for the group led by the leader. */
+internal sealed interface FloorAction {
+    data class AddAll(val ids: List<String>) : FloorAction
+    data class RemoveAll(val ids: List<String>) : FloorAction
+    data object None : FloorAction
+}
+
+/**
+ * Adds the floor's rooms that are not yet in the group; once all are in, offers to remove them.
+ * Unavailable rooms are never added, and permanent members are never removed.
+ */
+internal fun floorGroupAction(
+    section: FloorSection,
+    leader: PlayerData,
+    bound: Map<String, String>,
+): FloorAction {
+    if (section.isOther) return FloorAction.None
+    val inGroup = { room: PlayerData -> bound[room.playerId] == leader.playerId }
+    val addable = section.rooms
+        .filter { !inGroup(it) && it.player.isAvailable && it.playerId != leader.playerId }
+        .map { it.playerId }
+        .distinct()
+    if (addable.isNotEmpty()) return FloorAction.AddAll(addable)
+    val removable = section.rooms
+        .filter { inGroup(it) && leader.childrenBinds.firstOrNull { b -> b.id == it.playerId }?.isManageable != false }
+        .map { it.playerId }
+        .distinct()
+    return if (removable.isNotEmpty()) FloorAction.RemoveAll(removable) else FloorAction.None
+}

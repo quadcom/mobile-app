@@ -17,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -29,10 +30,12 @@ import io.music_assistant.client.data.location.PlayerLocation
 import io.music_assistant.client.data.model.client.PlayerData
 import io.music_assistant.client.ui.compose.common.action.PlayerAction
 import musicassistantclient.composeapp.generated.resources.Res
+import musicassistantclient.composeapp.generated.resources.speakers_add_all
 import musicassistantclient.composeapp.generated.resources.speakers_group_hint
 import musicassistantclient.composeapp.generated.resources.speakers_group_with
 import musicassistantclient.composeapp.generated.resources.speakers_leave_group
 import musicassistantclient.composeapp.generated.resources.speakers_playing
+import musicassistantclient.composeapp.generated.resources.speakers_remove_all
 import musicassistantclient.composeapp.generated.resources.speakers_this_room
 import org.jetbrains.compose.resources.stringResource
 
@@ -110,7 +113,20 @@ internal fun GroupEditorSheet(
                         }
                     }
                 }
-                floorSectionItems(sections) { room ->
+                floorSectionItems(
+                    sections,
+                    headingAction = { section ->
+                        when (val action = floorGroupAction(section, leader, bound)) {
+                            is FloorAction.AddAll -> TextButton(onClick = {
+                                onPlayerAction(leader.playerId, PlayerAction.GroupManage(toAdd = action.ids))
+                            }) { Text(stringResource(Res.string.speakers_add_all)) }
+                            is FloorAction.RemoveAll -> TextButton(onClick = {
+                                onPlayerAction(leader.playerId, PlayerAction.GroupManage(toRemove = action.ids))
+                            }) { Text(stringResource(Res.string.speakers_remove_all)) }
+                            FloorAction.None -> Unit
+                        }
+                    },
+                ) { room ->
                     val inGroup = bound[room.playerId] == leader.playerId
                     val tag = when (val t = editorTag(room, leader, players)) {
                         is EditorTag.Named -> t.name

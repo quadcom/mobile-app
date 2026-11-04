@@ -128,4 +128,61 @@ class SpeakerListLogicTest {
         val b = room("b")
         assertEquals(listOf("a"), offeredRooms(leader, listOf(leader, a, b)).map { it.playerId })
     }
+
+    private fun floor(vararg rooms: PlayerData, other: Boolean = false) =
+        FloorSection(if (other) "other" else "floor:F", if (other) null else "F", other, rooms.toList())
+
+    private fun unavailable(p: PlayerData) = p.copy(player = p.player.copy(isAvailable = false))
+
+    @Test
+    fun floorActionAddsWhenSomeAreOut() {
+        val leader = room("L", members = setOf("L", "a"))
+        val a = room("a")
+        val b = room("b")
+        val bound = boundLeaders(listOf(leader, a, b))
+        assertEquals(FloorAction.AddAll(listOf("b")), floorGroupAction(floor(leader, a, b), leader, bound))
+    }
+
+    @Test
+    fun floorActionRemovesWhenAllAreIn() {
+        val leader = room("L", members = setOf("L", "a", "b"), canGroup = listOf("a", "b"))
+        val a = room("a")
+        val b = room("b")
+        val bound = boundLeaders(listOf(leader, a, b))
+        assertEquals(FloorAction.RemoveAll(listOf("a", "b")), floorGroupAction(floor(a, b), leader, bound))
+    }
+
+    @Test
+    fun floorActionNeverRemovesALockedMember() {
+        val base = room("L", members = setOf("L", "a", "b"), canGroup = listOf("a", "b"))
+        val leader = base.copy(
+            childrenBinds = base.childrenBinds.map { if (it.id == "a") it.copy(isManageable = false) else it },
+        )
+        val a = room("a")
+        val b = room("b")
+        val bound = boundLeaders(listOf(leader, a, b))
+        assertEquals(FloorAction.RemoveAll(listOf("b")), floorGroupAction(floor(a, b), leader, bound))
+    }
+
+    @Test
+    fun floorActionNeverAddsAnUnavailableRoom() {
+        val leader = room("L")
+        val a = unavailable(room("a"))
+        val b = room("b")
+        assertEquals(FloorAction.AddAll(listOf("b")), floorGroupAction(floor(a, b), leader, emptyMap()))
+        assertEquals(FloorAction.None, floorGroupAction(floor(a), leader, emptyMap()))
+    }
+
+    @Test
+    fun floorActionIsNoneForOther() {
+        val leader = room("L")
+        assertEquals(FloorAction.None, floorGroupAction(floor(room("a"), other = true), leader, emptyMap()))
+    }
+
+    @Test
+    fun floorActionDropsDuplicateIds() {
+        val leader = room("L")
+        val a = room("a")
+        assertEquals(FloorAction.AddAll(listOf("a")), floorGroupAction(floor(a, a), leader, emptyMap()))
+    }
 }

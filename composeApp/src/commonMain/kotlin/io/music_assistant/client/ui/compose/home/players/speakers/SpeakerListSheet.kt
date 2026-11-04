@@ -202,7 +202,7 @@ fun SpeakerListSheet(
                         )
                     }
                 }
-                floorSectionItems(sections, card)
+                floorSectionItems(sections, card = card)
                 if (phone != null) {
                     sectionHeading("phone") { stringResource(Res.string.speakers_this_phone) }
                     item(key = "grid:phone") {
@@ -245,31 +245,54 @@ fun SpeakerListSheet(
     }
 }
 
-/** A floor heading: 14sp Medium primary. [title] is read in composition so it can be a resource. */
-internal fun LazyListScope.sectionHeading(key: String, title: @Composable () -> String) {
+/**
+ * A floor heading: 14sp Medium primary. [title] is read in composition so it can be a resource.
+ * [action], when given, sits at the right end of the same row.
+ */
+internal fun LazyListScope.sectionHeading(
+    key: String,
+    action: (@Composable () -> Unit)? = null,
+    title: @Composable () -> String,
+) {
     item(key = "head:$key") {
-        Text(
-            text = title(),
-            modifier = Modifier.animateItem().padding(start = 20.dp, end = 16.dp, top = 4.dp),
-            fontSize = 14.sp,
-            lineHeight = 20.sp,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.primary,
-        )
+        val text: @Composable (Modifier) -> Unit = { modifier ->
+            Text(
+                text = title(),
+                modifier = modifier,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        if (action == null) {
+            text(Modifier.animateItem().padding(start = 20.dp, end = 16.dp, top = 4.dp))
+        } else {
+            Row(
+                modifier = Modifier.animateItem().fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                text(Modifier.weight(1f))
+                action()
+            }
+        }
     }
 }
 
 /** The floor sections shared by the list and the editor; the heading-less block has no title. */
 internal fun LazyListScope.floorSectionItems(
     sections: List<FloorSection>,
+    // Before [card], so callers keep passing the card as the trailing lambda.
+    headingAction: (@Composable (FloorSection) -> Unit)? = null,
     card: @Composable (PlayerData) -> Unit,
 ) {
     sections.forEach { section ->
         val title = section.title
+        val action = headingAction?.let { act -> @Composable { act(section) } }
         if (section.isOther) {
-            sectionHeading(section.key) { stringResource(Res.string.speakers_other) }
+            sectionHeading(section.key, action) { stringResource(Res.string.speakers_other) }
         } else if (title != null) {
-            sectionHeading(section.key) { title }
+            sectionHeading(section.key, action) { title }
         }
         item(key = "grid:${section.key}") {
             RoomGrid(Modifier.animateItem().animateContentSize().padding(horizontal = 16.dp)) {

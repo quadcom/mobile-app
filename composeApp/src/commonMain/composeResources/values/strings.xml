@@ -359,6 +359,8 @@
   <string name="speakers_paused">Paused</string>
   <string name="speakers_playing">Playing</string>
   <string name="speakers_other">Other</string>
+  <string name="speakers_add_all">Add all</string>
+  <string name="speakers_remove_all">Remove all</string>
   <string name="speakers_this_phone">This phone</string>
   <string name="speakers_this_room">This room</string>
   <string name="speakers_group_with">Group with %1$s</string>
