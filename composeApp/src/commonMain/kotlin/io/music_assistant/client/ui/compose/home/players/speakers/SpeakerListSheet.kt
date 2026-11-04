@@ -75,6 +75,8 @@ fun SpeakerListSheet(
     onPlayerAction: (String, PlayerAction) -> Unit,
     hideUnavailable: Boolean,
     onToggleHideUnavailable: () -> Unit,
+    canLeaveGroup: Boolean,
+    onAdjustPlaybackDelay: (Int) -> Unit,
 ) {
     val locationSource = koinInject<PlayerLocationSource>()
     val locations by locationSource.locations.collectAsStateWithLifecycle()
@@ -89,6 +91,7 @@ fun SpeakerListSheet(
     LaunchedEffect(order) { if (order != topOrder) onTopOrderChange(order) }
 
     var editorFor by remember { mutableStateOf<String?>(null) }
+    var phoneTimingFor by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
 
     ModalBottomSheet(
@@ -149,7 +152,12 @@ fun SpeakerListSheet(
                     player = room,
                     dimmed = leaderName != null || unavailable,
                     tag = leaderName ?: unavailableText.takeIf { unavailable },
-                    onClick = if (ignored) null else ({ onMoveToPlayer(room.playerId) }),
+                    // The phone's card always opens its timing panel: timing matters most while it is grouped.
+                    onClick = when {
+                        room.isLocal -> ({ phoneTimingFor = room.playerId })
+                        ignored -> null
+                        else -> ({ onMoveToPlayer(room.playerId) })
+                    },
                 )
             }
 
@@ -174,7 +182,12 @@ fun SpeakerListSheet(
                             if (members.isNotEmpty()) {
                                 RoomGrid(Modifier.padding(start = 16.dp)) {
                                     members.forEach { member ->
-                                        key(member.playerId) { RoomCard(player = member) }
+                                        key(member.playerId) {
+                                            RoomCard(
+                                                player = member,
+                                                onClick = if (member.isLocal) ({ phoneTimingFor = member.playerId }) else null,
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -211,9 +224,24 @@ fun SpeakerListSheet(
                 players = players,
                 locations = locations,
                 onPlayerAction = onPlayerAction,
+                canLeaveGroup = canLeaveGroup,
                 onDismissRequest = { editorFor = null },
             )
         }
+    }
+
+    phoneTimingFor?.let { phoneId ->
+        val phone = players.byId(phoneId)
+        PhoneTimingSheet(
+            onAdjustPlaybackDelay = onAdjustPlaybackDelay,
+            onControl = phone?.takeIf { it.player.isSelectable }?.let {
+                {
+                    phoneTimingFor = null
+                    onMoveToPlayer(phoneId)
+                }
+            },
+            onDismissRequest = { phoneTimingFor = null },
+        )
     }
 }
 

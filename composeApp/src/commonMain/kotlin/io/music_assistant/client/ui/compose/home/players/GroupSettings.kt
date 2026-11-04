@@ -316,7 +316,7 @@ private fun GroupItemTitle(
 }
 
 @Composable
-private fun PlaybackDelayButtons(
+internal fun PlaybackDelayButtons(
     isEnabled: Boolean,
     onAdjust: ((Int) -> Unit)?,
 ) {

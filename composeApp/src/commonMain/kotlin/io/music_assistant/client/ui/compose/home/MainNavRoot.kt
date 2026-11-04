@@ -279,6 +279,7 @@ fun MainNavigationRoot(
     var speakerTopOrder by remember { mutableStateOf<List<String>>(emptyList()) }
     // The screen is captured here so the speaker sheets can blur it behind themselves.
     val sheetHazeState = rememberHazeState()
+    val leaderLeaveSupported by homeScreenViewModel.leaderLeaveSupported.collectAsStateWithLifecycle()
     playersState.let {
         if (it is HomeScreenViewModel.PlayersState.Data) {
             val selectedPlayer = it.selectedPlayer
@@ -299,6 +300,8 @@ fun MainNavigationRoot(
                         onPlayerAction = homeScreenViewModel::playerAction,
                         hideUnavailable = rememberHideUnavailablePlayers(),
                         onToggleHideUnavailable = rememberToggleHideUnavailablePlayers(),
+                        canLeaveGroup = leaderLeaveSupported,
+                        onAdjustPlaybackDelay = homeScreenViewModel::adjustSendspinStaticDelayMs,
                     )
                     }
                 }

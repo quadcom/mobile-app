@@ -5,6 +5,7 @@ package io.music_assistant.client.ui.compose.home.players.speakers
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,10 +15,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -28,6 +31,7 @@ import io.music_assistant.client.ui.compose.common.action.PlayerAction
 import musicassistantclient.composeapp.generated.resources.Res
 import musicassistantclient.composeapp.generated.resources.speakers_group_hint
 import musicassistantclient.composeapp.generated.resources.speakers_group_with
+import musicassistantclient.composeapp.generated.resources.speakers_leave_group
 import musicassistantclient.composeapp.generated.resources.speakers_playing
 import musicassistantclient.composeapp.generated.resources.speakers_this_room
 import org.jetbrains.compose.resources.stringResource
@@ -44,6 +48,7 @@ internal fun GroupEditorSheet(
     players: List<PlayerData>,
     locations: Map<String, PlayerLocation>,
     onPlayerAction: (String, PlayerAction) -> Unit,
+    canLeaveGroup: Boolean,
     onDismissRequest: () -> Unit,
 ) {
     val bound = remember(players) { boundLeaders(players) }
@@ -89,8 +94,20 @@ internal fun GroupEditorSheet(
             }
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 item(key = "this-room") {
-                    RoomGrid(Modifier.padding(horizontal = 16.dp)) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
                         RoomCard(player = leader, tag = thisRoom, tagAlpha = 0.6f)
+                        // The leader leaves via `ungroup`, not `set_members`: the server picks the
+                        // successor and moves the queue there. Older servers stop the music instead.
+                        if (canLeaveGroup && leader.player.canLeaveOwnGroup) {
+                            OutlinedButton(onClick = {
+                                onPlayerAction(leader.playerId, PlayerAction.LeaveGroup)
+                                onDismissRequest()
+                            }) { Text(stringResource(Res.string.speakers_leave_group)) }
+                        }
                     }
                 }
                 floorSectionItems(sections) { room ->
