@@ -4,6 +4,7 @@
 package io.music_assistant.client.ui.compose.home.players.speakers
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -56,6 +57,9 @@ import musicassistantclient.composeapp.generated.resources.speakers_other
 import musicassistantclient.composeapp.generated.resources.speakers_this_phone
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
+
+/** How long a room takes to fade into or out of the top rows. */
+private const val TOP_ROW_ANIM_MS = 1500
 
 /**
  * The speaker list: a row per playing room (plus the active one) on top, then every other room as
@@ -166,8 +170,14 @@ fun SpeakerListSheet(
                     if (row != null) {
                         val members = membersOf(row, players, bound).filter { it.playerId !in topIds }
                         Column(
+                            // Rooms fade in and out of the top over 1.5 s (Adrian, 2026-11-05), and the
+                            // rows below glide to their new place over the same time.
                             modifier = Modifier
-                                .animateItem()
+                                .animateItem(
+                                    fadeInSpec = tween(TOP_ROW_ANIM_MS),
+                                    placementSpec = tween(TOP_ROW_ANIM_MS),
+                                    fadeOutSpec = tween(TOP_ROW_ANIM_MS),
+                                )
                                 .animateContentSize()
                                 .padding(horizontal = 16.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
