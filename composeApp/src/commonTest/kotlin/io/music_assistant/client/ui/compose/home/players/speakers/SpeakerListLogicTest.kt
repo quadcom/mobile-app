@@ -6,6 +6,7 @@ import io.music_assistant.client.data.location.SpeakerGrouping
 import io.music_assistant.client.data.model.client.PlayerData
 import io.music_assistant.client.data.model.client.PlayerData.ChildBind
 import io.music_assistant.client.data.model.client.PlayerDataFixtures
+import io.music_assistant.client.data.model.client.PlayerType
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -261,6 +262,19 @@ class SpeakerListLogicTest {
         assertEquals(GroupColour.ORANGE, colours["c"])
         assertEquals(GroupColour.PURPLE, colours["a"])
         assertEquals(GroupColour.GREEN, colours["b"])
+    }
+
+    @Test
+    fun aPermanentSyncGroupGetsNoColour() {
+        val sync = groupOf("sync", "m1").let { list ->
+            list.map { p ->
+                if (p.playerId == "sync") p.copy(player = p.player.copy(type = PlayerType.GROUP)) else p
+            }
+        }
+        val players = sync + groupOf("a", "x")
+        val colours = groupColours(players, boundLeaders(players), mapOf("sync" to GroupColour.PINK))
+        assertEquals(null, colours["sync"])
+        assertEquals(GroupColour.ORANGE, colours["a"])
     }
 
     @Test

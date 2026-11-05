@@ -76,7 +76,8 @@ internal fun groupColours(
     bound: Map<String, String>,
     server: Map<String, GroupColour>,
 ): Map<String, GroupColour> {
-    val leaders = bound.values.toSet()
+    // Only groups made on the fly get a colour; a permanent sync group does not (Adrian, 2026-11-05).
+    val leaders = bound.values.toSet().filter { players.byId(it)?.player?.isGroup != true }
     val result = leaders.mapNotNull { id -> server[id]?.let { id to it } }.toMap().toMutableMap()
     val unset = leaders.filter { it !in result }
         .sortedWith(compareBy({ id -> players.byId(id)?.player?.name?.lowercase().orEmpty() }, { it }))
