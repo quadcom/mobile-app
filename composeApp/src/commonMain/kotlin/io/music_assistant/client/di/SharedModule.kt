@@ -20,7 +20,7 @@ import io.music_assistant.client.data.announcement.AnnouncementRepository
 import io.music_assistant.client.data.factory.MediaItemFactory
 import io.music_assistant.client.data.factory.PlayerFactory
 import io.music_assistant.client.data.factory.QueueFactory
-import io.music_assistant.client.data.location.HomeAssistantLocationSource
+import io.music_assistant.client.data.location.MusicAssistantLocationSource
 import io.music_assistant.client.data.location.PlayerLocationSource
 import io.music_assistant.client.data.play.PlayDispatcher
 import io.music_assistant.client.data.repository.AiRadioRepository
@@ -199,15 +199,13 @@ fun sharedModule(
                 scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
             )
         }
-        single {                            // Speaker floors from Home Assistant; reads outlive the screen
-            HomeAssistantLocationSource(
+        single<PlayerLocationSource> {      // Speaker floors from Music Assistant; reads outlive the screen
+            MusicAssistantLocationSource(
+                apiClient = get(),
                 settings = get(),
-                httpClientFactory = get(),
                 scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
             )
         }
-        // The settings screen needs the concrete type for its status, everyone else the contract.
-        single<PlayerLocationSource> { get<HomeAssistantLocationSource>() }
         singleOf(::LibrarySortRepository)   // Library sort choices; caches the 2.11 sort_options
         singleOf(::MainDataSource)          // Singleton - held by foreground service
         single(createdAtStart = true) {     // Eager - must observe car edges from launch
@@ -219,7 +217,7 @@ fun sharedModule(
         factory { BackgroundRestrictionViewModel(get(), get(), get()) }
         factory { SchemaVersionWarningViewModel(get()) }
         factory { ActionsViewModel(get(), get(), get(), get()) }
-        factory { SettingsViewModel(get(), get(), get(), get(), get(), get()) }
+        factory { SettingsViewModel(get(), get(), get(), get(), get()) }
         factory {
             val mainDataSource = get<MainDataSource>()
             SendspinSettingsViewModel(

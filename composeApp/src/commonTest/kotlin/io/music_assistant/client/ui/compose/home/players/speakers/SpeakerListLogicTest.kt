@@ -1,6 +1,7 @@
 package io.music_assistant.client.ui.compose.home.players.speakers
 
 import io.music_assistant.client.data.location.PlayerLocation
+import io.music_assistant.client.data.location.SpeakerGrouping
 import io.music_assistant.client.data.model.client.PlayerData
 import io.music_assistant.client.data.model.client.PlayerData.ChildBind
 import io.music_assistant.client.data.model.client.PlayerDataFixtures
@@ -184,5 +185,51 @@ class SpeakerListLogicTest {
         val leader = room("L")
         val a = room("a")
         assertEquals(FloorAction.AddAll(listOf("a")), floorGroupAction(floor(a, a), leader, emptyMap()))
+    }
+
+    private val groupingRooms = listOf(room("k"), room("b"), room("g"), room("n"))
+    private val groupingLocations = mapOf(
+        "k" to PlayerLocation("Kitchen", "Ground", 0, listOf("Party", "Loud")),
+        "b" to PlayerLocation("bedroom", "Upper", 1, listOf("Party")),
+        "g" to PlayerLocation("Garage", null, null),
+    )
+
+    @Test
+    fun noGroupingGivesOnePlainSection() {
+        val sections = speakerSections(groupingRooms, groupingLocations, SpeakerGrouping.NONE)
+        assertEquals(listOf("all"), sections.map { it.key })
+        assertNull(sections.single().title)
+        assertEquals(listOf("b", "g", "k", "n"), sections.single().rooms.map { it.playerId })
+    }
+
+    @Test
+    fun floorGroupingMatchesFloorSections() {
+        assertEquals(
+            floorSections(groupingRooms, groupingLocations),
+            speakerSections(groupingRooms, groupingLocations, SpeakerGrouping.FLOOR),
+        )
+    }
+
+    @Test
+    fun areaGroupingRunsAToZWithOtherLast() {
+        val sections = speakerSections(groupingRooms, groupingLocations, SpeakerGrouping.AREA)
+        assertEquals(listOf("area:bedroom", "area:Garage", "area:Kitchen", "other"), sections.map { it.key })
+        assertTrue(sections.last().isOther)
+        assertEquals(listOf("n"), sections.last().rooms.map { it.playerId })
+    }
+
+    @Test
+    fun labelGroupingRepeatsARoomUnderEachLabel() {
+        val sections = speakerSections(groupingRooms, groupingLocations, SpeakerGrouping.LABEL)
+        assertEquals(listOf("label:Loud", "label:Party", "other"), sections.map { it.key })
+        assertEquals(listOf("b", "k"), sections[1].rooms.map { it.playerId })
+        assertEquals(listOf("k"), sections[0].rooms.map { it.playerId })
+        assertEquals(listOf("g", "n"), sections.last().rooms.map { it.playerId })
+    }
+
+    @Test
+    fun noLocationsGivesOnePlainSectionForAnyGrouping() {
+        val sections = speakerSections(groupingRooms, emptyMap(), SpeakerGrouping.LABEL)
+        assertEquals(listOf("all"), sections.map { it.key })
     }
 }

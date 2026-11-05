@@ -80,6 +80,7 @@ fun SpeakerListSheet(
 ) {
     val locationSource = koinInject<PlayerLocationSource>()
     val locations by locationSource.locations.collectAsStateWithLifecycle()
+    val grouping by locationSource.grouping.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { locationSource.refresh() }
 
     val activeId = selectedPlayer.playerId
@@ -141,7 +142,7 @@ fun SpeakerListSheet(
                 .filter { it.playerId !in topIds && !it.isLocal }
                 .filter { !hideUnavailable || it.player.isSelectable }
             val phone = players.firstOrNull { it.isLocal && it.playerId !in topIds }
-            val sections = floorSections(cardRooms, locations)
+            val sections = speakerSections(cardRooms, locations, grouping)
             val unavailableText = stringResource(Res.string.player_unavailable)
 
             val card: @Composable (PlayerData) -> Unit = { room ->
@@ -223,6 +224,7 @@ fun SpeakerListSheet(
                 leader = leader,
                 players = players,
                 locations = locations,
+                grouping = grouping,
                 onPlayerAction = onPlayerAction,
                 canLeaveGroup = canLeaveGroup,
                 onDismissRequest = { editorFor = null },

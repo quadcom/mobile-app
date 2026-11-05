@@ -508,17 +508,6 @@
   <string name="settings_remote_id">Remote ID</string>
   <string name="settings_remote_id_hint">Enter the Remote ID from your Music Assistant server settings</string>
   <string name="settings_remote_id_invalid">Invalid Remote ID format</string>
-  <string name="settings_ha_title">Home Assistant</string>
-  <string name="settings_ha_help">Lets the speaker list group rooms by floor. Use an access token from your Home Assistant profile page.</string>
-  <string name="settings_ha_address">Home Assistant address</string>
-  <string name="settings_ha_token">Home Assistant access token</string>
-  <string name="settings_ha_save">Save</string>
-  <string name="settings_ha_status_connected">Connected – %1$d speakers placed</string>
-  <string name="settings_ha_failed_address">Couldn\'t connect: the address must start with http:// or https://</string>
-  <string name="settings_ha_failed_auth">Couldn\'t connect: Home Assistant rejected the token</string>
-  <string name="settings_ha_failed_timeout">Couldn\'t connect: Home Assistant took too long to answer</string>
-  <string name="settings_ha_failed_unreachable">Couldn\'t connect: Home Assistant could not be reached</string>
-  <string name="settings_ha_failed_answer">Couldn\'t connect: Home Assistant gave an answer the app can\'t read</string>
   <string name="settings_saved_connections">Saved Connections</string>
   <string name="settings_scan_qr">Scan QR code</string>
   <string name="settings_sendspin_advanced_summary">buffer, custom connection, and more</string>

@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.music_assistant.client.data.location.PlayerLocation
+import io.music_assistant.client.data.location.SpeakerGrouping
 import io.music_assistant.client.data.model.client.PlayerData
 import io.music_assistant.client.ui.compose.common.action.PlayerAction
 import musicassistantclient.composeapp.generated.resources.Res
@@ -50,6 +51,7 @@ internal fun GroupEditorSheet(
     leader: PlayerData,
     players: List<PlayerData>,
     locations: Map<String, PlayerLocation>,
+    grouping: SpeakerGrouping,
     onPlayerAction: (String, PlayerAction) -> Unit,
     canLeaveGroup: Boolean,
     onDismissRequest: () -> Unit,
@@ -61,7 +63,7 @@ internal fun GroupEditorSheet(
             it.player.isAvailable || bound[it.playerId] == leader.playerId
         }
     }
-    val sections = remember(offered, locations) { floorSections(offered, locations) }
+    val sections = remember(offered, locations, grouping) { speakerSections(offered, locations, grouping) }
     val thisRoom = stringResource(Res.string.speakers_this_room)
     val playingText = stringResource(Res.string.speakers_playing)
 

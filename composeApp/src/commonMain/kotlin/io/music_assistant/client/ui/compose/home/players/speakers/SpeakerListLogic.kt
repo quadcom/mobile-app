@@ -1,6 +1,7 @@
 package io.music_assistant.client.ui.compose.home.players.speakers
 
 import io.music_assistant.client.data.location.PlayerLocation
+import io.music_assistant.client.data.location.SpeakerGrouping
 import io.music_assistant.client.data.model.client.PlayerData
 import io.music_assistant.client.data.model.client.byId
 
@@ -108,6 +109,33 @@ internal fun floorSections(
         FloorSection("floor:$name", name, false, list.sortedWith(byName))
     }
     val other = rooms.filter { floorOf(it) == null }.sortedWith(byName)
+    return if (other.isEmpty()) sections else sections + FloorSection("other", null, true, other)
+}
+
+/**
+ * Sections for the server's chosen [grouping]. Area and label sections run A-Z; a room with no area
+ * (or no label) goes last under "Other", and a room with two labels appears under both.
+ */
+internal fun speakerSections(
+    rooms: List<PlayerData>,
+    locations: Map<String, PlayerLocation>,
+    grouping: SpeakerGrouping,
+): List<FloorSection> {
+    if (grouping == SpeakerGrouping.FLOOR) return floorSections(rooms, locations)
+    if (rooms.isEmpty()) return emptyList()
+    if (grouping == SpeakerGrouping.NONE || locations.isEmpty()) {
+        return listOf(FloorSection("all", null, false, rooms.sortedWith(byName)))
+    }
+    val isLabel = grouping == SpeakerGrouping.LABEL
+    fun titlesOf(room: PlayerData): List<String> = locations[room.playerId]?.let {
+        if (isLabel) it.labels.distinct() else listOfNotNull(it.areaName)
+    }.orEmpty()
+    val prefix = if (isLabel) "label" else "area"
+    val titled = rooms.flatMap { room -> titlesOf(room).map { it to room } }.groupBy({ it.first }, { it.second })
+    val sections = titled.entries.sortedBy { it.key.lowercase() }.map { (title, list) ->
+        FloorSection("$prefix:$title", title, false, list.sortedWith(byName))
+    }
+    val other = rooms.filter { titlesOf(it).isEmpty() }.sortedWith(byName)
     return if (other.isEmpty()) sections else sections + FloorSection("other", null, true, other)
 }
 
