@@ -4,6 +4,7 @@
 package io.music_assistant.client.ui.compose.home.players.speakers
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -39,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -59,8 +61,8 @@ import musicassistantclient.composeapp.generated.resources.speakers_this_phone
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 
-/** How long a room takes to fade into or out of the top rows. */
-private const val TOP_ROW_ANIM_MS = 1500
+/** How long a group row takes to fade into, out of, or move within the top rows. */
+private const val GROUP_ROW_ANIM_MS = 500
 
 /** Waits for a burst of membership updates to settle before the colours are read again. */
 private const val LOCATION_REFRESH_DELAY_MS = 1000L
@@ -155,8 +157,9 @@ fun SpeakerListSheet(
             }
 
             val topIds = order.toSet()
+            val hiddenRooms = remember(players) { permanentGroupRooms(players) }
             val cardRooms = players
-                .filter { it.playerId !in topIds && !it.isLocal }
+                .filter { it.playerId !in topIds && !it.isLocal && it.playerId !in hiddenRooms }
                 .filter { !hideUnavailable || it.player.isSelectable }
             val phone = players.firstOrNull { it.isLocal && it.playerId !in topIds }
             val sections = speakerSections(cardRooms, locations, grouping)
@@ -183,17 +186,20 @@ fun SpeakerListSheet(
                     val row = players.byId(id)
                     if (row != null) {
                         val groupColour = colours[id]
-                        val members = membersOf(row, players, bound).filter { it.playerId !in topIds }
+                        val members = membersOf(row, players, bound)
+                            .filter { it.playerId !in topIds && it.playerId !in hiddenRooms }
                         // The leader is a card too, first, so every speaker in the group shows.
                         val groupCards = if (groupColour != null) listOf(row) + members else members
+                        // Only group rows animate, 0.5 s ease-out (Adrian, 2026-11-05: a big paused group
+                        // vanishing was "jarring"); lone rooms swapping in the same place stay still.
+                        val rowSpec = tween<Float>(GROUP_ROW_ANIM_MS, easing = EaseOut)
+                        val placeSpec = tween<IntOffset>(GROUP_ROW_ANIM_MS, easing = EaseOut)
                         Column(
-                            // Rooms fade in and out of the top over 1.5 s (Adrian, 2026-11-05), and the
-                            // rows below glide to their new place over the same time.
                             modifier = Modifier
                                 .animateItem(
-                                    fadeInSpec = tween(TOP_ROW_ANIM_MS),
-                                    placementSpec = tween(TOP_ROW_ANIM_MS),
-                                    fadeOutSpec = tween(TOP_ROW_ANIM_MS),
+                                    fadeInSpec = if (groupCards.isNotEmpty()) rowSpec else null,
+                                    placementSpec = if (groupCards.isNotEmpty()) placeSpec else null,
+                                    fadeOutSpec = if (groupCards.isNotEmpty()) rowSpec else null,
                                 )
                                 .animateContentSize()
                                 .padding(horizontal = 16.dp),

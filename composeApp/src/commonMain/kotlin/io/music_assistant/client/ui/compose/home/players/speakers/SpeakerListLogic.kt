@@ -174,6 +174,16 @@ internal fun speakerSections(
     return if (other.isEmpty()) sections else sections + FloorSection("other", null, true, other)
 }
 
+/**
+ * The rooms inside permanent (server-made) groups, minus the groups themselves. A permanent group's rooms never
+ * show anywhere; only the group itself does (Adrian, 2026-11-05).
+ */
+internal fun permanentGroupRooms(players: List<PlayerData>): Set<String> {
+    val groups = players.filter { it.player.isGroup }
+    val groupIds = groups.mapTo(mutableSetOf()) { it.playerId }
+    return groups.flatMapTo(mutableSetOf()) { it.player.groupMembers.orEmpty() } - groupIds
+}
+
 /** Rooms the group editor offers: those the leader can group with, never the leader or the phone. */
 internal fun offeredRooms(leader: PlayerData, players: List<PlayerData>): List<PlayerData> {
     val ids = leader.childrenBinds.mapTo(mutableSetOf()) { it.id }

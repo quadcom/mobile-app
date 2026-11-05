@@ -61,8 +61,9 @@ internal fun GroupEditorSheet(
     val bound = remember(players) { boundLeaders(players) }
     // Only rooms the leader can group with; an unreachable room is offered only to take it out.
     val offered = remember(leader, players, bound) {
+        val hidden = permanentGroupRooms(players)
         offeredRooms(leader, players).filter {
-            it.player.isAvailable || bound[it.playerId] == leader.playerId
+            it.playerId !in hidden && (it.player.isAvailable || bound[it.playerId] == leader.playerId)
         }
     }
     val sections = remember(offered, locations, grouping) { speakerSections(offered, locations, grouping) }

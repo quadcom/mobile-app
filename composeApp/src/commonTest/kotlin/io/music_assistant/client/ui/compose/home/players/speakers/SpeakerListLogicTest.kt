@@ -278,6 +278,19 @@ class SpeakerListLogicTest {
     }
 
     @Test
+    fun permanentGroupRoomsAreItsMembersButNotTheGroup() {
+        val players = groupOf("sync", "m1", "m2").map { p ->
+            if (p.playerId == "sync") p.copy(player = p.player.copy(type = PlayerType.GROUP)) else p
+        }
+        assertEquals(setOf("m1", "m2"), permanentGroupRooms(players))
+    }
+
+    @Test
+    fun anOnTheFlyGroupHidesNoRooms() {
+        assertEquals(emptySet(), permanentGroupRooms(groupOf("a", "x")))
+    }
+
+    @Test
     fun fallbackWrapsAfterSixGroups() {
         val ids = listOf("a", "b", "c", "d", "e", "f", "g")
         val players = ids.flatMap { groupOf(it, "m$it") }
