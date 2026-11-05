@@ -20,8 +20,6 @@ import io.music_assistant.client.data.announcement.AnnouncementRepository
 import io.music_assistant.client.data.factory.MediaItemFactory
 import io.music_assistant.client.data.factory.PlayerFactory
 import io.music_assistant.client.data.factory.QueueFactory
-import io.music_assistant.client.data.location.MusicAssistantLocationSource
-import io.music_assistant.client.data.location.PlayerLocationSource
 import io.music_assistant.client.data.play.PlayDispatcher
 import io.music_assistant.client.data.repository.AiRadioRepository
 import io.music_assistant.client.data.repository.ItemRefresher
@@ -31,6 +29,7 @@ import io.music_assistant.client.data.repository.ProviderRepository
 import io.music_assistant.client.data.repository.QueueOverlayRepository
 import io.music_assistant.client.data.repository.ServiceClientMediaItemRepository
 import io.music_assistant.client.data.repository.TranscriptRepository
+import io.music_assistant.client.data.speakers.SpeakerListSource
 import io.music_assistant.client.imageloader.ArtworkDiskStore
 import io.music_assistant.client.imageloader.ArtworkRepository
 import io.music_assistant.client.imageloader.ArtworkTransport
@@ -199,8 +198,8 @@ fun sharedModule(
                 scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
             )
         }
-        single<PlayerLocationSource> {      // Speaker floors from Music Assistant; reads outlive the screen
-            MusicAssistantLocationSource(
+        single {                            // The server-built speaker list; reads outlive the screen
+            SpeakerListSource(
                 apiClient = get(),
                 settings = get(),
                 scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),

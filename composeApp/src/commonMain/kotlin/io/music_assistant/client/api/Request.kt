@@ -58,7 +58,7 @@ data class Request @OptIn(ExperimentalUuidApi::class) constructor(
     data object Player {
         fun all() = Request(command = APICommands.PLAYERS_ALL)
 
-        fun locations() = Request(command = APICommands.PLAYER_LOCATIONS)
+        fun speakerList() = Request(command = APICommands.SPEAKER_LIST)
 
         fun simpleCommand(
             playerId: String,

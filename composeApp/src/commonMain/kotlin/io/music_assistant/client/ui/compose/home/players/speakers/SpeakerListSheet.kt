@@ -44,13 +44,12 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import io.music_assistant.client.data.location.PlayerLocationSource
 import io.music_assistant.client.data.model.client.PlayerData
 import io.music_assistant.client.data.model.client.byId
+import io.music_assistant.client.data.speakers.SpeakerListSource
 import io.music_assistant.client.ui.compose.common.OverflowMenuButton
 import io.music_assistant.client.ui.compose.common.OverflowMenuOption
 import io.music_assistant.client.ui.compose.common.action.PlayerAction
-import kotlinx.coroutines.delay
 import musicassistantclient.composeapp.generated.resources.Res
 import musicassistantclient.composeapp.generated.resources.cd_more
 import musicassistantclient.composeapp.generated.resources.player_unavailable
@@ -63,9 +62,6 @@ import org.koin.compose.koinInject
 
 /** How long a group row takes to fade into, out of, or move within the top rows. */
 private const val GROUP_ROW_ANIM_MS = 500
-
-/** Waits for a burst of membership updates to settle before the colours are read again. */
-private const val LOCATION_REFRESH_DELAY_MS = 1000L
 
 /**
  * The speaker list: a row per playing room (plus the active one) on top, then every other room as
@@ -88,23 +84,15 @@ fun SpeakerListSheet(
     canLeaveGroup: Boolean,
     onAdjustPlaybackDelay: (Int) -> Unit,
 ) {
-    val locationSource = koinInject<PlayerLocationSource>()
-    val locations by locationSource.locations.collectAsStateWithLifecycle()
-    val grouping by locationSource.grouping.collectAsStateWithLifecycle()
-    val serverColours by locationSource.groupColours.collectAsStateWithLifecycle()
+    val listSource = koinInject<SpeakerListSource>()
+    val list by listSource.list.collectAsStateWithLifecycle()
 
     val activeId = selectedPlayer.playerId
-    val bound = remember(players) { boundLeaders(players) }
-    val colours = remember(players, bound, serverColours) { groupColours(players, bound, serverColours) }
-    // Read on open, then again a second after the group membership changes: the server colours a new
-    // group when it forms, and the answer only arrives when asked for.
-    var firstRead by remember { mutableStateOf(true) }
-    LaunchedEffect(bound) {
-        if (!firstRead) delay(LOCATION_REFRESH_DELAY_MS)
-        firstRead = false
-        locationSource.refresh()
-    }
-    val order = remember(players, topOrder, activeId) {
+    // Group membership comes from the server's list; a stock server sends none, so every room stands alone.
+    val bound = remember(list) { list?.bound.orEmpty() }
+    // Read on open; the server's change event keeps it current while the sheet is up.
+    LaunchedEffect(Unit) { listSource.refresh() }
+    val order = remember(players, bound, topOrder, activeId) {
         nextTopOrder(topOrder, playingRoomIds(players, bound), activeId)
             .filter { id -> players.any { it.playerId == id } }
     }
@@ -179,16 +167,16 @@ fun SpeakerListSheet(
             }
 
             val topIds = order.toSet()
-            val hiddenRooms = remember(players) { permanentGroupRooms(players) }
-            val cardRooms = players
-                .filter { it.playerId !in topIds && !it.isLocal && it.playerId !in hiddenRooms }
-                .filter { !hideUnavailable || it.player.isSelectable }
             val phone = players.firstOrNull { it.isLocal && it.playerId !in topIds }
-            val sections = speakerSections(cardRooms, locations, grouping)
+            // The phone is lifted out of the server's sections into "This phone".
+            val sections = listSections(list, players) { room, server ->
+                room.playerId !in topIds && !room.isLocal &&
+                    (!hideUnavailable || (server?.available ?: room.player.isSelectable))
+            }
             val unavailableText = stringResource(Res.string.player_unavailable)
 
             val card: @Composable (PlayerData) -> Unit = { room ->
-                val groupColour = colourOf(room.playerId, bound, colours)
+                val groupColour = list?.colourOf(room.playerId)
                 val unavailable = !room.player.isSelectable
                 RoomCard(
                     player = room,
@@ -207,9 +195,8 @@ fun SpeakerListSheet(
                 items(order, key = { "top:$it" }) { id ->
                     val row = players.byId(id)
                     if (row != null) {
-                        val groupColour = colours[id]
-                        val members = membersOf(row, players, bound)
-                            .filter { it.playerId !in topIds && it.playerId !in hiddenRooms }
+                        val groupColour = list?.ledColour(id)
+                        val members = membersOf(row, players, bound).filter { it.playerId !in topIds }
                         // The leader is a card too, first, so every speaker in the group shows.
                         val groupCards = if (groupColour != null) listOf(row) + members else members
                         // Only group rows animate, 0.5 s ease-out (Adrian, 2026-11-05: a big paused group
@@ -280,9 +267,7 @@ fun SpeakerListSheet(
             GroupEditorSheet(
                 leader = leader,
                 players = players,
-                locations = locations,
-                grouping = grouping,
-                colours = colours,
+                list = list,
                 onPlayerAction = { id, action ->
                     if (action is PlayerAction.LeaveGroup) {
                         leaving = id to bound.filterValues { it == id }.keys
@@ -354,10 +339,11 @@ internal fun LazyListScope.floorSectionItems(
     sections.forEach { section ->
         val title = section.title
         val action = headingAction?.let { act -> @Composable { act(section) } }
-        if (section.isOther) {
-            sectionHeading(section.key, action) { stringResource(Res.string.speakers_other) }
-        } else if (title != null) {
+        // A null title is "Other" for that section and no heading for the plain block.
+        if (title != null) {
             sectionHeading(section.key, action) { title }
+        } else if (section.isOther) {
+            sectionHeading(section.key, action) { stringResource(Res.string.speakers_other) }
         }
         item(key = "grid:${section.key}") {
             RoomGrid(Modifier.animateItem().animateContentSize().padding(horizontal = 16.dp)) {

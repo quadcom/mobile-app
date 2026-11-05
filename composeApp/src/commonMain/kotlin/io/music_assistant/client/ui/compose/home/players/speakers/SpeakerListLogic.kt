@@ -1,15 +1,15 @@
 package io.music_assistant.client.ui.compose.home.players.speakers
 
-import io.music_assistant.client.data.location.GroupColour
-import io.music_assistant.client.data.location.PlayerLocation
-import io.music_assistant.client.data.location.SpeakerGrouping
 import io.music_assistant.client.data.model.client.PlayerData
 import io.music_assistant.client.data.model.client.byId
+import io.music_assistant.client.data.speakers.SectionKind
+import io.music_assistant.client.data.speakers.SpeakerList
+import io.music_assistant.client.data.speakers.SpeakerRoom
 
-// Pure grouping and sorting rules for the speaker list and the group editor, kept apart from
+// Pure rules for drawing the server's speaker list and the group editor, kept apart from
 // Compose so they can be tested without a UI.
 
-/** One floor of the speaker list. [title] is null for "Other" and for the heading-less block. */
+/** One section of the speaker list. [title] is null for "Other" and for the heading-less block. */
 internal data class FloorSection(
     val key: String,
     val title: String?,
@@ -26,21 +26,6 @@ internal sealed interface EditorTag {
 }
 
 private val byName = compareBy<PlayerData>({ it.player.name.lowercase() }, { it.playerId })
-
-/** Maps each room that is bound into another room's group to that group's leader id. */
-internal fun boundLeaders(players: List<PlayerData>): Map<String, String> {
-    val result = mutableMapOf<String, String>()
-    players.forEach { p ->
-        p.player.groupMembers?.forEach { member ->
-            if (member != p.playerId) result[member] = p.playerId
-        }
-    }
-    // A member the leader's list did not name still says whom it follows.
-    players.forEach { p ->
-        p.player.syncedTo?.takeIf { it != p.playerId }?.let { result.putIfAbsent(p.playerId, it) }
-    }
-    return result
-}
 
 /**
  * Ids of the rooms that get a row: rooms actually playing (or announcing) and not bound into another
@@ -66,35 +51,6 @@ internal fun nextTopOrder(
     return keep + (playingIds + activeId).filter { it !in keep }.distinct()
 }
 
-/**
- * The colour of each group, keyed by leader id. A leader the server coloured keeps that colour; the
- * rest (the server sends none yet, or has not seen a new group) take the lowest colours still free,
- * in leader-name order, wrapping after the last colour.
- */
-internal fun groupColours(
-    players: List<PlayerData>,
-    bound: Map<String, String>,
-    server: Map<String, GroupColour>,
-): Map<String, GroupColour> {
-    // Only groups made on the fly get a colour; a permanent sync group does not (Adrian, 2026-11-05).
-    val leaders = bound.values.toSet().filter { players.byId(it)?.player?.isGroup != true }
-    val result = leaders.mapNotNull { id -> server[id]?.let { id to it } }.toMap().toMutableMap()
-    val unset = leaders.filter { it !in result }
-        .sortedWith(compareBy({ id -> players.byId(id)?.player?.name?.lowercase().orEmpty() }, { it }))
-    unset.forEach { id ->
-        val free = GroupColour.entries.firstOrNull { it !in result.values }
-        result[id] = free ?: GroupColour.entries[result.size % GroupColour.entries.size]
-    }
-    return result
-}
-
-/** The colour of the group this room is in (its own if it leads, else its leader's), or null. */
-internal fun colourOf(
-    roomId: String,
-    bound: Map<String, String>,
-    colours: Map<String, GroupColour>,
-): GroupColour? = colours[bound[roomId] ?: roomId]
-
 /** The members bound to [leader], sorted by name. */
 internal fun membersOf(
     leader: PlayerData,
@@ -102,13 +58,6 @@ internal fun membersOf(
     bound: Map<String, String>,
 ): List<PlayerData> =
     players.filter { bound[it.playerId] == leader.playerId }.sortedWith(byName)
-
-/** The name of the room this one is bound into, or null when it is free to select. */
-internal fun groupLeaderName(
-    room: PlayerData,
-    players: List<PlayerData>,
-    bound: Map<String, String>,
-): String? = bound[room.playerId]?.let { players.byId(it)?.player?.name }
 
 /**
  * The player a tap on this card selects: null when the room is unavailable, the group leader's id when
@@ -119,78 +68,26 @@ internal fun cardTapTarget(room: PlayerData, bound: Map<String, String>, unavail
     if (unavailable) null else bound[room.playerId] ?: room.playerId
 
 /**
- * Groups rooms by floor: highest level first, then the floor with more rooms, then floor name; rooms with no location, area or
- * floor go last under "Other". With no locations at all there are no headings, just one block.
+ * The sections to draw, in the server's order, with each room joined to its live player data by id. [keep]
+ * decides per room from its live data and the server's entry for it (null on a stock server). A server room
+ * the app has no live data for is skipped: the cards draw from [PlayerData], so there is nothing to grey out.
+ * A stock server (null [list]) gives one plain block sorted by name, with no headings.
  */
-internal fun floorSections(
-    rooms: List<PlayerData>,
-    locations: Map<String, PlayerLocation>,
+internal fun listSections(
+    list: SpeakerList?,
+    players: List<PlayerData>,
+    keep: (PlayerData, SpeakerRoom?) -> Boolean,
 ): List<FloorSection> {
-    if (rooms.isEmpty()) return emptyList()
-    if (locations.isEmpty()) {
-        return listOf(FloorSection("all", null, false, rooms.sortedWith(byName)))
+    if (list == null) {
+        val rooms = players.filter { keep(it, null) }.sortedWith(byName)
+        return if (rooms.isEmpty()) emptyList() else listOf(FloorSection("all", null, false, rooms))
     }
-    fun floorOf(room: PlayerData): String? =
-        locations[room.playerId]?.takeIf { it.areaName != null }?.floorName
-    val located = rooms.filter { floorOf(it) != null }.groupBy { floorOf(it) }
-    // Floors can share a level (a garage beside the main floor), so the floor with more speakers
-    // comes first, then the name. A floor without a level sorts after every floor that has one.
-    val floors = located.entries.sortedWith(
-        compareByDescending<Map.Entry<String?, List<PlayerData>>> { entry ->
-            entry.value.firstNotNullOfOrNull { locations[it.playerId]?.floorLevel } ?: Int.MIN_VALUE
-        }.thenByDescending { it.value.size }.thenBy { it.key },
-    )
-    val sections = floors.map { (name, list) ->
-        FloorSection("floor:$name", name, false, list.sortedWith(byName))
+    val live = players.associateBy { it.playerId }
+    return list.sections.mapNotNull { section ->
+        val rooms = section.rooms.distinct().mapNotNull { id -> live[id]?.takeIf { keep(it, list.rooms[id]) } }
+        val isOther = section.kind == SectionKind.OTHER
+        if (rooms.isEmpty()) null else FloorSection(section.key, section.title, isOther, rooms)
     }
-    val other = rooms.filter { floorOf(it) == null }.sortedWith(byName)
-    return if (other.isEmpty()) sections else sections + FloorSection("other", null, true, other)
-}
-
-/**
- * Sections for the server's chosen [grouping]. Area and label sections run A-Z; a room with no area
- * (or no label) goes last under "Other", and a room with two labels appears under both.
- */
-internal fun speakerSections(
-    rooms: List<PlayerData>,
-    locations: Map<String, PlayerLocation>,
-    grouping: SpeakerGrouping,
-): List<FloorSection> {
-    if (grouping == SpeakerGrouping.FLOOR) return floorSections(rooms, locations)
-    if (rooms.isEmpty()) return emptyList()
-    if (grouping == SpeakerGrouping.NONE || locations.isEmpty()) {
-        return listOf(FloorSection("all", null, false, rooms.sortedWith(byName)))
-    }
-    val isLabel = grouping == SpeakerGrouping.LABEL
-    fun titlesOf(room: PlayerData): List<String> = locations[room.playerId]?.let {
-        if (isLabel) it.labels.distinct() else listOfNotNull(it.areaName)
-    }.orEmpty()
-    val prefix = if (isLabel) "label" else "area"
-    val titled = rooms.flatMap { room -> titlesOf(room).map { it to room } }.groupBy({ it.first }, { it.second })
-    val sections = titled.entries.sortedBy { it.key.lowercase() }.map { (title, list) ->
-        FloorSection("$prefix:$title", title, false, list.sortedWith(byName))
-    }
-    val other = rooms.filter { titlesOf(it).isEmpty() }.sortedWith(byName)
-    return if (other.isEmpty()) sections else sections + FloorSection("other", null, true, other)
-}
-
-/**
- * The rooms inside permanent (server-made) groups, minus the groups themselves. A permanent group's rooms never
- * show anywhere; only the group itself does (Adrian, 2026-11-05).
- */
-internal fun permanentGroupRooms(players: List<PlayerData>): Set<String> {
-    val groups = players.filter { it.player.isGroup }
-    val groupIds = groups.mapTo(mutableSetOf()) { it.playerId }
-    return groups.flatMapTo(mutableSetOf()) { it.player.groupMembers.orEmpty() } - groupIds
-}
-
-/**
- * Rooms the group editor offers: those the leader can group with, and the leader itself (its card
- * takes it out of its own group). Never the phone.
- */
-internal fun offeredRooms(leader: PlayerData, players: List<PlayerData>): List<PlayerData> {
-    val ids = leader.childrenBinds.mapTo(mutableSetOf()) { it.id }
-    return players.filter { (it.playerId in ids || it.playerId == leader.playerId) && !it.isLocal }
 }
 
 /**
@@ -210,9 +107,10 @@ internal fun editorTag(
     room: PlayerData,
     leader: PlayerData,
     players: List<PlayerData>,
+    bound: Map<String, String>,
 ): EditorTag {
     if (room.playerId == leader.playerId) return EditorTag.ThisRoom
-    val ownerId = boundLeaders(players)[room.playerId]
+    val ownerId = bound[room.playerId]
     return when {
         ownerId == leader.playerId -> EditorTag.Named(leader.player.name)
         ownerId == null && room.player.isPlaying -> EditorTag.Playing

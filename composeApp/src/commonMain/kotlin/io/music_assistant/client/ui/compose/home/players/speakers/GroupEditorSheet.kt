@@ -23,10 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.music_assistant.client.data.location.GroupColour
-import io.music_assistant.client.data.location.PlayerLocation
-import io.music_assistant.client.data.location.SpeakerGrouping
 import io.music_assistant.client.data.model.client.PlayerData
+import io.music_assistant.client.data.speakers.SpeakerList
 import io.music_assistant.client.ui.compose.common.action.PlayerAction
 import musicassistantclient.composeapp.generated.resources.Res
 import musicassistantclient.composeapp.generated.resources.speakers_add_all
@@ -47,24 +45,25 @@ import org.jetbrains.compose.resources.stringResource
 internal fun GroupEditorSheet(
     leader: PlayerData,
     players: List<PlayerData>,
-    locations: Map<String, PlayerLocation>,
-    grouping: SpeakerGrouping,
-    colours: Map<String, GroupColour>,
+    list: SpeakerList?,
     onPlayerAction: (String, PlayerAction) -> Unit,
     canLeaveGroup: Boolean,
     onDismissRequest: () -> Unit,
 ) {
-    val bound = remember(players) { boundLeaders(players) }
-    // Only rooms the leader can group with; an unreachable room is offered only to take it out.
-    val offered = remember(leader, players, bound) {
-        val hidden = permanentGroupRooms(players)
-        offeredRooms(leader, players).filter {
-            it.playerId !in hidden && (
-                it.player.isAvailable || it.playerId == leader.playerId || bound[it.playerId] == leader.playerId
-            )
+    val bound = remember(list) { list?.bound.orEmpty() }
+    // The server's `group_with` for the leader (a stock server sends none, so the leader's own list stands in),
+    // plus the leader and its current members so they show highlighted. Never the phone, and an unreachable
+    // room is offered only to take it out.
+    val sections = remember(list, leader, players, bound) {
+        val offeredIds = (list?.rooms?.get(leader.playerId)?.groupWith ?: leader.childrenBinds.map { it.id })
+            .toSet() + leader.playerId + bound.filterValues { it == leader.playerId }.keys
+        listSections(list, players) { room, _ ->
+            room.playerId in offeredIds && !room.isLocal && (
+                room.player.isAvailable || room.playerId == leader.playerId ||
+                    bound[room.playerId] == leader.playerId
+                )
         }
     }
-    val sections = remember(offered, locations, grouping) { speakerSections(offered, locations, grouping) }
     val thisRoom = stringResource(Res.string.speakers_this_room)
     val playingText = stringResource(Res.string.speakers_playing)
 
@@ -88,7 +87,7 @@ internal fun GroupEditorSheet(
         ) {
             Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp)) {
                 Text(
-                    text = colours[leader.playerId]?.word()
+                    text = list?.colourOf(leader.playerId)?.word()
                         ?: stringResource(Res.string.speakers_group_with, leader.player.name),
                     style = MaterialTheme.typography.titleMedium,
                 )
@@ -117,8 +116,8 @@ internal fun GroupEditorSheet(
                     val isLeader = room.playerId == leader.playerId
                     val inGroup = isLeader || bound[room.playerId] == leader.playerId
                     // A room in any group shows that group's colour line and word; others keep the old tag.
-                    val roomColour = colourOf(room.playerId, bound, colours)
-                    val tag = roomColour?.word() ?: when (val t = editorTag(room, leader, players)) {
+                    val roomColour = list?.colourOf(room.playerId)
+                    val tag = roomColour?.word() ?: when (val t = editorTag(room, leader, players, bound)) {
                         is EditorTag.Named -> t.name
                         EditorTag.Playing -> playingText
                         EditorTag.ThisRoom -> thisRoom

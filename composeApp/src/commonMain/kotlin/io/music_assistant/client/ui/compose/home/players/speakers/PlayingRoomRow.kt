@@ -37,9 +37,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import io.music_assistant.client.data.location.GroupColour
 import io.music_assistant.client.data.model.client.PlayerData
 import io.music_assistant.client.data.model.client.qualityTier
+import io.music_assistant.client.data.speakers.GroupColour
 import io.music_assistant.client.imageloader.rememberArtworkRequest
 import io.music_assistant.client.ui.compose.common.icons.NowPlayingIcon
 import io.music_assistant.client.ui.compose.common.icons.PauseIcon

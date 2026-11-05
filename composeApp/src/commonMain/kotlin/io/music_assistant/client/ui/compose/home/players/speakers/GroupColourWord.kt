@@ -1,7 +1,7 @@
 package io.music_assistant.client.ui.compose.home.players.speakers
 
 import androidx.compose.runtime.Composable
-import io.music_assistant.client.data.location.GroupColour
+import io.music_assistant.client.data.speakers.GroupColour
 import musicassistantclient.composeapp.generated.resources.Res
 import musicassistantclient.composeapp.generated.resources.speakers_colour_green
 import musicassistantclient.composeapp.generated.resources.speakers_colour_orange

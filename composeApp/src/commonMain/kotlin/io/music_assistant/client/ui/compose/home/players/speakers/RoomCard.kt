@@ -42,8 +42,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import io.music_assistant.client.data.location.GroupColour
 import io.music_assistant.client.data.model.client.PlayerData
+import io.music_assistant.client.data.speakers.GroupColour
 import io.music_assistant.client.ui.compose.home.players.iconRes
 import org.jetbrains.compose.resources.painterResource
 

@@ -1,12 +1,12 @@
 package io.music_assistant.client.ui.compose.home.players.speakers
 
-import io.music_assistant.client.data.location.GroupColour
-import io.music_assistant.client.data.location.PlayerLocation
-import io.music_assistant.client.data.location.SpeakerGrouping
 import io.music_assistant.client.data.model.client.PlayerData
 import io.music_assistant.client.data.model.client.PlayerData.ChildBind
 import io.music_assistant.client.data.model.client.PlayerDataFixtures
-import io.music_assistant.client.data.model.client.PlayerType
+import io.music_assistant.client.data.speakers.SectionKind
+import io.music_assistant.client.data.speakers.SpeakerList
+import io.music_assistant.client.data.speakers.SpeakerRoom
+import io.music_assistant.client.data.speakers.SpeakerSection
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -57,44 +57,12 @@ class SpeakerListLogicTest {
     }
 
     @Test
-    fun floorsSortByLevelDescendingAndOtherComesLast() {
-        val rooms = listOf(room("k"), room("b"), room("g"), room("n"))
-        val locations = mapOf(
-            "k" to PlayerLocation("Kitchen", "Ground", 0),
-            "b" to PlayerLocation("Bedroom", "Upstairs", 1),
-            "g" to PlayerLocation(null, "Ground", 0),
-        )
-        val sections = floorSections(rooms, locations)
-        assertEquals(listOf("Upstairs", "Ground", null), sections.map { it.title })
-        assertTrue(sections.last().isOther)
-        // "g" has no area, so it joins "n" under Other.
-        assertEquals(listOf("g", "n"), sections.last().rooms.map { it.playerId })
-    }
-
-    @Test
-    fun cardsInAFloorAreSortedByName() {
-        val rooms = listOf(room("1", "Zed"), room("2", "alpha"))
-        val loc = PlayerLocation("A", "F", 0)
-        val sections = floorSections(rooms, mapOf("1" to loc, "2" to loc))
-        assertEquals(listOf("alpha", "Zed"), sections.single().rooms.map { it.player.name })
-    }
-
-    @Test
-    fun noLocationsMeansOneBlockWithoutHeadings() {
-        val sections = floorSections(listOf(room("b"), room("a")), emptyMap())
-        assertEquals(1, sections.size)
-        assertNull(sections.single().title)
-        assertTrue(!sections.single().isOther)
-    }
-
-    @Test
     fun aBoundRoomIsGreyedAndNamesItsLeader() {
         val leader = room("L", "Kitchen", playing = true, members = setOf("L", "m"))
         val member = room("m")
         val free = room("f")
         val players = listOf(leader, member, free)
-        val bound = boundLeaders(players)
-        assertEquals("Kitchen", groupLeaderName(member, players, bound))
+        val bound = boundOf(players)
         assertEquals(listOf("L"), playingRoomIds(players, bound))
         assertEquals(listOf("m"), membersOf(leader, players, bound).map { it.playerId })
     }
@@ -104,7 +72,7 @@ class SpeakerListLogicTest {
         val leader = room("L", "Kitchen", playing = true, members = setOf("L", "m"))
         val member = room("m")
         val free = room("f")
-        val bound = boundLeaders(listOf(leader, member, free))
+        val bound = boundOf(listOf(leader, member, free))
         assertEquals("L", cardTapTarget(member, bound, unavailable = false))
         assertEquals("f", cardTapTarget(free, bound, unavailable = false))
         assertNull(cardTapTarget(free, bound, unavailable = true))
@@ -127,25 +95,11 @@ class SpeakerListLogicTest {
         val idle = room("idle")
         val players = listOf(leader, inGroup, solo, otherLeader, other, idle)
 
-        assertEquals(EditorTag.ThisRoom, editorTag(leader, leader, players))
-        assertEquals(EditorTag.Named("Kitchen"), editorTag(inGroup, leader, players))
-        assertEquals(EditorTag.Playing, editorTag(solo, leader, players))
-        assertEquals(EditorTag.Named("Patio"), editorTag(other, leader, players))
-        assertEquals(EditorTag.None, editorTag(idle, leader, players))
-    }
-
-    @Test
-    fun editorOffersOnlyRoomsTheLeaderCanGroupWith() {
-        val leader = room("L", canGroup = listOf("a"))
-        val a = room("a")
-        val b = room("b")
-        assertEquals(listOf("L", "a"), offeredRooms(leader, listOf(leader, a, b)).map { it.playerId })
-    }
-
-    @Test
-    fun theLeaderIsOfferedEvenWhenItCannotGroupWithItself() {
-        val leader = room("L")
-        assertEquals(listOf("L"), offeredRooms(leader, listOf(leader)).map { it.playerId })
+        assertEquals(EditorTag.ThisRoom, editorTag(leader, leader, players, boundOf(players)))
+        assertEquals(EditorTag.Named("Kitchen"), editorTag(inGroup, leader, players, boundOf(players)))
+        assertEquals(EditorTag.Playing, editorTag(solo, leader, players, boundOf(players)))
+        assertEquals(EditorTag.Named("Patio"), editorTag(other, leader, players, boundOf(players)))
+        assertEquals(EditorTag.None, editorTag(idle, leader, players, boundOf(players)))
     }
 
     @Test
@@ -174,7 +128,7 @@ class SpeakerListLogicTest {
         val leader = room("L", members = setOf("L", "a"))
         val a = room("a")
         val b = room("b")
-        val bound = boundLeaders(listOf(leader, a, b))
+        val bound = boundOf(listOf(leader, a, b))
         assertEquals(FloorAction.AddAll(listOf("b")), floorGroupAction(floor(leader, a, b), leader, bound))
     }
 
@@ -183,7 +137,7 @@ class SpeakerListLogicTest {
         val leader = room("L", members = setOf("L", "a", "b"), canGroup = listOf("a", "b"))
         val a = room("a")
         val b = room("b")
-        val bound = boundLeaders(listOf(leader, a, b))
+        val bound = boundOf(listOf(leader, a, b))
         assertEquals(FloorAction.RemoveAll(listOf("a", "b")), floorGroupAction(floor(a, b), leader, bound))
     }
 
@@ -195,7 +149,7 @@ class SpeakerListLogicTest {
         )
         val a = room("a")
         val b = room("b")
-        val bound = boundLeaders(listOf(leader, a, b))
+        val bound = boundOf(listOf(leader, a, b))
         assertEquals(FloorAction.RemoveAll(listOf("b")), floorGroupAction(floor(a, b), leader, bound))
     }
 
@@ -221,115 +175,60 @@ class SpeakerListLogicTest {
         assertEquals(FloorAction.AddAll(listOf("a")), floorGroupAction(floor(a, a), leader, emptyMap()))
     }
 
-    private val groupingRooms = listOf(room("k"), room("b"), room("g"), room("n"))
-    private val groupingLocations = mapOf(
-        "k" to PlayerLocation("Kitchen", "Ground", 0, listOf("Party", "Loud")),
-        "b" to PlayerLocation("bedroom", "Upper", 1, listOf("Party")),
-        "g" to PlayerLocation("Garage", null, null),
-    )
+    // What the server's list would say about who follows whom, built from the fixtures' member lists.
+    private fun boundOf(players: List<PlayerData>): Map<String, String> =
+        players.flatMap { p -> p.player.groupMembers.orEmpty().filter { it != p.playerId }.map { it to p.playerId } }
+            .toMap()
+
+    private fun serverList(vararg sections: SpeakerSection, rooms: Map<String, SpeakerRoom> = emptyMap()) =
+        SpeakerList(1, sections.toList(), rooms, emptyList())
+
+    private val open = SpeakerRoom(available = true, groupLeader = null, groupWith = emptyList())
 
     @Test
-    fun noGroupingGivesOnePlainSection() {
-        val sections = speakerSections(groupingRooms, groupingLocations, SpeakerGrouping.NONE)
-        assertEquals(listOf("all"), sections.map { it.key })
-        assertNull(sections.single().title)
-        assertEquals(listOf("b", "g", "k", "n"), sections.single().rooms.map { it.playerId })
-    }
-
-    @Test
-    fun floorGroupingMatchesFloorSections() {
-        assertEquals(
-            floorSections(groupingRooms, groupingLocations),
-            speakerSections(groupingRooms, groupingLocations, SpeakerGrouping.FLOOR),
+    fun joinKeepsTheServersSectionsAndOrderAndSkipsRoomsWithoutLiveData() {
+        val list = serverList(
+            SpeakerSection("floor:up", SectionKind.FLOOR, "Upstairs", listOf("z", "ghost")),
+            SpeakerSection("floor:main", SectionKind.FLOOR, "Main", listOf("b", "a")),
+            SpeakerSection("other", SectionKind.OTHER, null, listOf("ghost")),
         )
+        val sections = listSections(list, listOf(room("a"), room("b"), room("z"))) { _, _ -> true }
+        assertEquals(listOf("floor:up", "floor:main"), sections.map { it.key })
+        assertEquals(listOf("z"), sections[0].rooms.map { it.playerId })
+        // The server's order stands: no re-sorting by name.
+        assertEquals(listOf("b", "a"), sections[1].rooms.map { it.playerId })
     }
 
     @Test
-    fun areaGroupingRunsAToZWithOtherLast() {
-        val sections = speakerSections(groupingRooms, groupingLocations, SpeakerGrouping.AREA)
-        assertEquals(listOf("area:bedroom", "area:Garage", "area:Kitchen", "other"), sections.map { it.key })
-        assertTrue(sections.last().isOther)
-        assertEquals(listOf("n"), sections.last().rooms.map { it.playerId })
+    fun joinMarksOtherAndDropsRoomsTheFilterRefuses() {
+        val list = serverList(
+            SpeakerSection("other", SectionKind.OTHER, null, listOf("a", "phone")),
+            rooms = mapOf("a" to open, "phone" to open.copy(available = false)),
+        )
+        val sections = listSections(list, listOf(room("a"), room("phone"))) { _, server -> server?.available == true }
+        assertTrue(sections.single().isOther)
+        assertEquals(listOf("a"), sections.single().rooms.map { it.playerId })
     }
 
     @Test
-    fun labelGroupingRepeatsARoomUnderEachLabel() {
-        val sections = speakerSections(groupingRooms, groupingLocations, SpeakerGrouping.LABEL)
-        assertEquals(listOf("label:Loud", "label:Party", "other"), sections.map { it.key })
-        assertEquals(listOf("b", "k"), sections[1].rooms.map { it.playerId })
-        assertEquals(listOf("k"), sections[0].rooms.map { it.playerId })
-        assertEquals(listOf("g", "n"), sections.last().rooms.map { it.playerId })
+    fun joinPassesTheLivePlayerSoThePhoneCanBeLiftedOut() {
+        val phone = room("p").copy(isLocal = true)
+        val list = serverList(SpeakerSection("all", SectionKind.ALL, null, listOf("p", "a")))
+        val sections = listSections(list, listOf(phone, room("a"))) { r, _ -> !r.isLocal }
+        assertEquals(listOf("a"), sections.single().rooms.map { it.playerId })
     }
 
     @Test
-    fun noLocationsGivesOnePlainSectionForAnyGrouping() {
-        val sections = speakerSections(groupingRooms, emptyMap(), SpeakerGrouping.LABEL)
-        assertEquals(listOf("all"), sections.map { it.key })
-    }
-
-    private fun groupOf(leader: String, vararg members: String) =
-        listOf(room(leader, members = setOf(leader, *members))) + members.map { room(it) }
-
-    @Test
-    fun serverColourIsKept() {
-        val players = groupOf("a", "x")
-        val colours = groupColours(players, boundLeaders(players), mapOf("a" to GroupColour.TEAL))
-        assertEquals(mapOf("a" to GroupColour.TEAL), colours)
+    fun aStockServerGivesOnePlainListSortedByName() {
+        val sections = listSections(null, listOf(room("1", "Zed"), room("2", "alpha"))) { _, _ -> true }
+        assertEquals(1, sections.size)
+        assertNull(sections.single().title)
+        assertTrue(!sections.single().isOther)
+        assertEquals(listOf("alpha", "Zed"), sections.single().rooms.map { it.player.name })
     }
 
     @Test
-    fun fallbackTakesLowestFreeColoursInLeaderNameOrder() {
-        val players = groupOf("b", "x") + groupOf("a", "y") + groupOf("c", "z")
-        val colours = groupColours(players, boundLeaders(players), mapOf("c" to GroupColour.ORANGE))
-        assertEquals(GroupColour.ORANGE, colours["c"])
-        assertEquals(GroupColour.PURPLE, colours["a"])
-        assertEquals(GroupColour.GREEN, colours["b"])
-    }
-
-    @Test
-    fun aPermanentSyncGroupGetsNoColour() {
-        val sync = groupOf("sync", "m1").let { list ->
-            list.map { p ->
-                if (p.playerId == "sync") p.copy(player = p.player.copy(type = PlayerType.GROUP)) else p
-            }
-        }
-        val players = sync + groupOf("a", "x")
-        val colours = groupColours(players, boundLeaders(players), mapOf("sync" to GroupColour.PINK))
-        assertEquals(null, colours["sync"])
-        assertEquals(GroupColour.ORANGE, colours["a"])
-    }
-
-    @Test
-    fun permanentGroupRoomsAreItsMembersButNotTheGroup() {
-        val players = groupOf("sync", "m1", "m2").map { p ->
-            if (p.playerId == "sync") p.copy(player = p.player.copy(type = PlayerType.GROUP)) else p
-        }
-        assertEquals(setOf("m1", "m2"), permanentGroupRooms(players))
-    }
-
-    @Test
-    fun anOnTheFlyGroupHidesNoRooms() {
-        assertEquals(emptySet(), permanentGroupRooms(groupOf("a", "x")))
-    }
-
-    @Test
-    fun fallbackWrapsAfterSixGroups() {
-        val ids = listOf("a", "b", "c", "d", "e", "f", "g")
-        val players = ids.flatMap { groupOf(it, "m$it") }
-        val colours = groupColours(players, boundLeaders(players), emptyMap())
-        assertEquals(7, colours.size)
-        assertEquals(GroupColour.ORANGE, colours["a"])
-        assertEquals(GroupColour.TEAL, colours["f"])
-        assertEquals(GroupColour.entries.first(), colours["g"])
-    }
-
-    @Test
-    fun aMemberTakesItsLeadersColourAndALoneRoomHasNone() {
-        val players = groupOf("a", "x") + room("solo")
-        val bound = boundLeaders(players)
-        val colours = groupColours(players, bound, emptyMap())
-        assertEquals(GroupColour.ORANGE, colourOf("x", bound, colours))
-        assertEquals(GroupColour.ORANGE, colourOf("a", bound, colours))
-        assertNull(colourOf("solo", bound, colours))
+    fun aStockServerWithNoRoomsGivesNoSections() {
+        assertEquals(emptyList(), listSections(null, emptyList()) { _, _ -> true })
     }
 }

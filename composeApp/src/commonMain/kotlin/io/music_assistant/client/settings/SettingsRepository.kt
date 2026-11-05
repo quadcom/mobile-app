@@ -125,11 +125,11 @@ class SettingsRepository(
         }
     }
 
-    /** Last good speaker-locations reply from Music Assistant as JSON; empty when none is cached. */
-    var playerLocationsJson: String
-        get() = settings.getString("player_locations", "")
+    /** Last good `hass/speaker_list` reply from Music Assistant as JSON; empty when none is cached. */
+    var speakerListJson: String
+        get() = settings.getString("speaker_list", "")
         set(value) {
-            settings.putString("player_locations", value)
+            settings.putString("speaker_list", value)
         }
 
     /**

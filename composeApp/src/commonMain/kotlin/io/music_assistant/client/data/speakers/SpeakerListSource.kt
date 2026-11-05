@@ -1,0 +1,199 @@
+package io.music_assistant.client.data.speakers
+
+import co.touchlab.kermit.Logger
+import io.music_assistant.client.api.Request
+import io.music_assistant.client.api.ServiceClient
+import io.music_assistant.client.data.model.server.events.ProviderEvent
+import io.music_assistant.client.settings.SettingsRepository
+import io.music_assistant.client.utils.myJson
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.longOrNull
+
+/** The colour that marks a group of speakers; the server names it, the app only paints it. */
+enum class GroupColour(val wire: String, val argb: Long) {
+    ORANGE("orange", 0xFFFB923C),
+    PURPLE("purple", 0xFFA855F7),
+    GREEN("green", 0xFF22C55E),
+    PINK("pink", 0xFFEC4899),
+    YELLOW("yellow", 0xFFFACC15),
+    TEAL("teal", 0xFF14B8A6),
+    ;
+
+    companion object {
+        fun fromWire(word: String?): GroupColour? = entries.firstOrNull { it.wire == word?.lowercase() }
+    }
+}
+
+enum class SectionKind(val wire: String) {
+    FLOOR("floor"),
+    AREA("area"),
+    LABEL("label"),
+    OTHER("other"),
+    ALL("all"),
+    ;
+
+    companion object {
+        // An unknown kind is drawn like any titled section rather than dropped.
+        fun fromWire(word: String?): SectionKind = entries.firstOrNull { it.wire == word?.lowercase() } ?: AREA
+    }
+}
+
+/** One block of the list, in the server's order. [rooms] are player ids; a room may sit in several sections. */
+data class SpeakerSection(
+    val key: String,
+    val kind: SectionKind,
+    val title: String?,
+    val rooms: List<String>,
+)
+
+/** What the server says about one room; the name and live state come from the app's own player data. */
+data class SpeakerRoom(
+    val available: Boolean,
+    /** Set when the room is a greyed member of another room's group. */
+    val groupLeader: String?,
+    /** The rooms the group editor offers for this room as a leader. */
+    val groupWith: List<String>,
+)
+
+/** A group made on the fly; members are in name order. */
+data class SpeakerGroup(val leader: String, val colour: GroupColour?, val members: List<String>)
+
+/** The finished speaker list from `hass/speaker_list`. */
+data class SpeakerList(
+    val revision: Long,
+    val sections: List<SpeakerSection>,
+    val rooms: Map<String, SpeakerRoom>,
+    val groups: List<SpeakerGroup>,
+) {
+    /** Room id to its group leader's id, for every room the server marks as a member. */
+    val bound: Map<String, String> = rooms.mapNotNull { (id, room) -> room.groupLeader?.let { id to it } }.toMap()
+
+    /** The colour of the group this room leads, or null. */
+    fun ledColour(roomId: String): GroupColour? = groups.firstOrNull { it.leader == roomId }?.colour
+
+    /** The colour of the group this room is in (its own if it leads, else its leader's), or null. */
+    fun colourOf(roomId: String): GroupColour? =
+        groups.firstOrNull { roomId == it.leader || roomId in it.members }?.colour
+}
+
+@Serializable
+private data class SpeakerListReply(
+    val revision: Long = 0,
+    val sections: List<SectionDto> = emptyList(),
+    val rooms: Map<String, RoomDto> = emptyMap(),
+    val groups: List<GroupDto> = emptyList(),
+)
+
+@Serializable
+private data class SectionDto(
+    val key: String = "",
+    val kind: String? = null,
+    val title: String? = null,
+    val rooms: List<String> = emptyList(),
+)
+
+@Serializable
+private data class RoomDto(
+    val available: Boolean = true,
+    @SerialName("group_leader") val groupLeader: String? = null,
+    @SerialName("group_with") val groupWith: List<String> = emptyList(),
+)
+
+@Serializable
+private data class GroupDto(
+    val leader: String = "",
+    val colour: String? = null,
+    val members: List<String> = emptyList(),
+)
+
+/** Decodes the `hass/speaker_list` reply; unknown keys are ignored and missing ones take plain defaults. */
+internal fun decodeSpeakerList(json: String): SpeakerList {
+    val reply = myJson.decodeFromString<SpeakerListReply>(json)
+    return SpeakerList(
+        revision = reply.revision,
+        sections = reply.sections.map { SpeakerSection(it.key, SectionKind.fromWire(it.kind), it.title, it.rooms) },
+        rooms = reply.rooms.mapValues { (_, r) -> SpeakerRoom(r.available, r.groupLeader, r.groupWith) },
+        groups = reply.groups.map { SpeakerGroup(it.leader, GroupColour.fromWire(it.colour), it.members) },
+    )
+}
+
+/**
+ * Whether a `speaker_list` event is worth a re-read: its revision differs from the held one (a restarted
+ * server counts again from zero, so "newer" would miss its changes). An event whose revision cannot be read
+ * counts as changed, because a needless re-read is cheap and a missed one is not.
+ */
+internal fun isChangedRevision(eventData: JsonObject?, held: Long?): Boolean {
+    val revision = (eventData?.get("revision") as? JsonPrimitive)?.longOrNull ?: return true
+    return revision != held
+}
+
+/**
+ * The speaker list as the Music Assistant server builds it (`hass/speaker_list`). Holds null when the
+ * server has no such command (a stock server) or nothing was read yet; the last good list is cached in
+ * settings so the list is there at app start.
+ */
+class SpeakerListSource(
+    private val apiClient: ServiceClient,
+    private val settings: SettingsRepository,
+    private val scope: CoroutineScope,
+) {
+    private val log = Logger.withTag("SpeakerList")
+
+    private val _list = MutableStateFlow(
+        settings.speakerListJson.takeIf { it.isNotEmpty() }
+            ?.let { runCatching { decodeSpeakerList(it) }.getOrNull() },
+    )
+    val list: StateFlow<SpeakerList?> = _list
+
+    private var job: Job? = null
+
+    init {
+        // The event carries only a revision, because the list is per user; the list is read again.
+        scope.launch {
+            apiClient.events
+                .filterIsInstance<ProviderEvent>()
+                .filter { it.objectId?.endsWith(EVENT_SUFFIX) == true }
+                .collect { if (isChangedRevision(it.data, _list.value?.revision)) refresh() }
+        }
+    }
+
+    /** Re-reads the server in the background. On failure the last good list is kept. */
+    fun refresh() {
+        // A read that began before the change would answer with the old list, so a new one replaces it.
+        job?.cancel()
+        job = scope.launch {
+            try {
+                val answer = withTimeout(TIMEOUT_MS) { apiClient.sendRequest(Request.Player.speakerList()) }
+                    .getOrThrow()
+                val json = answer.result?.toString() ?: error("empty reply")
+                _list.value = decodeSpeakerList(json)
+                settings.speakerListJson = json
+            } catch (e: CancellationException) {
+                // A timeout is a failed read; any other cancellation must reach the scope.
+                if (e !is TimeoutCancellationException) throw e
+                log.w { "Could not read the speaker list: timeout" }
+            } catch (e: Exception) {
+                // Class name only: a message could carry server details.
+                log.w { "Could not read the speaker list: ${e::class.simpleName}" }
+            }
+        }
+    }
+
+    private companion object {
+        const val TIMEOUT_MS = 10_000L
+        const val EVENT_SUFFIX = "/speaker_list"
+    }
+}

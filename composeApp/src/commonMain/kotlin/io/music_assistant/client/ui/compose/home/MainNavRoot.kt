@@ -54,7 +54,6 @@ import dev.chrisbanes.haze.rememberHazeState
 import io.music_assistant.client.api.DeepLinkBus
 import io.music_assistant.client.api.DeepLinkDestination
 import io.music_assistant.client.api.ErrorMessageBus
-import io.music_assistant.client.data.location.PlayerLocationSource
 import io.music_assistant.client.data.model.client.ClickContext
 import io.music_assistant.client.data.model.client.MediaType
 import io.music_assistant.client.data.model.client.items.Album
@@ -67,6 +66,7 @@ import io.music_assistant.client.data.model.client.items.Podcast
 import io.music_assistant.client.data.model.client.items.PodcastEpisode
 import io.music_assistant.client.data.model.client.items.RecommendationFolder
 import io.music_assistant.client.data.model.client.items.Track
+import io.music_assistant.client.data.speakers.SpeakerListSource
 import io.music_assistant.client.input.VolumeButtonService
 import io.music_assistant.client.nav.AdaptiveNavigationBarLayout
 import io.music_assistant.client.nav.BackHandler
@@ -91,8 +91,6 @@ import io.music_assistant.client.ui.compose.home.players.rememberHideUnavailable
 import io.music_assistant.client.ui.compose.home.players.rememberToggleHideUnavailablePlayers
 import io.music_assistant.client.ui.compose.home.players.speakers.LocalSheetHazeState
 import io.music_assistant.client.ui.compose.home.players.speakers.SpeakerListSheet
-import io.music_assistant.client.ui.compose.home.players.speakers.boundLeaders
-import io.music_assistant.client.ui.compose.home.players.speakers.groupColours
 import io.music_assistant.client.ui.compose.home.players.speakers.word
 import io.music_assistant.client.ui.compose.item.ItemDetailsScreen
 import io.music_assistant.client.ui.compose.item.ItemDetailsViewModel
@@ -173,11 +171,8 @@ fun MainNavigationRoot(
     // Single pager state used across all views
     val data = playersState as? HomeScreenViewModel.PlayersState.Data
     // The colour of the group the selected room leads, for the player bar button (null when it leads none).
-    val serverGroupColours by koinInject<PlayerLocationSource>().groupColours.collectAsStateWithLifecycle()
-    val selectedGroupColour = remember(data?.allPlayerData, data?.selectedPlayer?.playerId, serverGroupColours) {
-        val all = data?.allPlayerData.orEmpty()
-        groupColours(all, boundLeaders(all), serverGroupColours)[data?.selectedPlayer?.playerId]
-    }
+    val speakerList by koinInject<SpeakerListSource>().list.collectAsStateWithLifecycle()
+    val selectedGroupColour = data?.selectedPlayer?.playerId?.let { speakerList?.ledColour(it) }
     val playerPagerState = rememberPagerState(
         initialPage = data?.selectedPlayerIndex ?: 0,
         pageCount = { data?.playerData?.size ?: 0 },

@@ -3,7 +3,7 @@ package io.music_assistant.client.api
 object APICommands {
     // Player commands
     const val PLAYERS_ALL = "players/all"
-    const val PLAYER_LOCATIONS = "hass/player_locations"
+    const val SPEAKER_LIST = "hass/speaker_list"
     const val PLAYERS_CMD = "players/cmd"
     const val PLAYERS_CMD_SEEK = "$PLAYERS_CMD/seek"
     const val PLAYERS_CMD_POWER = "$PLAYERS_CMD/power"
