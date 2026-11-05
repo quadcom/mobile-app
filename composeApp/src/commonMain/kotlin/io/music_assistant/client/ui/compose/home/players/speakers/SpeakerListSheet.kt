@@ -148,7 +148,6 @@ fun SpeakerListSheet(
             val card: @Composable (PlayerData) -> Unit = { room ->
                 val leaderName = groupLeaderName(room, players, bound)
                 val unavailable = !room.player.isSelectable
-                val ignored = cardTapsIgnored(leaderName) || unavailable
                 RoomCard(
                     player = room,
                     dimmed = leaderName != null || unavailable,
@@ -156,8 +155,7 @@ fun SpeakerListSheet(
                     // The phone's card always opens its timing panel: timing matters most while it is grouped.
                     onClick = when {
                         room.isLocal -> ({ phoneTimingFor = room.playerId })
-                        ignored -> null
-                        else -> ({ onMoveToPlayer(room.playerId) })
+                        else -> cardTapTarget(room, bound, unavailable)?.let { id -> { onMoveToPlayer(id) } }
                     },
                 )
             }

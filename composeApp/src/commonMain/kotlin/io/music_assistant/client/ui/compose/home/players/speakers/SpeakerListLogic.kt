@@ -80,8 +80,13 @@ internal fun groupLeaderName(
     bound: Map<String, String>,
 ): String? = bound[room.playerId]?.let { players.byId(it)?.player?.name }
 
-/** A bound room is greyed and ignores taps; adding and removing live in the group editor. */
-internal fun cardTapsIgnored(groupLeaderName: String?): Boolean = groupLeaderName != null
+/**
+ * The player a tap on this card selects: null when the room is unavailable, the group leader's id when
+ * the room is bound into a group, else the room's own id. A grouped card stays greyed but a tap opens its
+ * group (Adrian, 2026-11-05); adding and removing stay in the group editor.
+ */
+internal fun cardTapTarget(room: PlayerData, bound: Map<String, String>, unavailable: Boolean): String? =
+    if (unavailable) null else bound[room.playerId] ?: room.playerId
 
 /**
  * Groups rooms by floor: highest level first, then the floor with more rooms, then floor name; rooms with no location, area or

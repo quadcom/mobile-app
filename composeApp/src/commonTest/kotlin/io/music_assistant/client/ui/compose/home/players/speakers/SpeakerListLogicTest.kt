@@ -86,17 +86,27 @@ class SpeakerListLogicTest {
     }
 
     @Test
-    fun aBoundRoomIsGreyedAndIgnoresTaps() {
+    fun aBoundRoomIsGreyedAndNamesItsLeader() {
         val leader = room("L", "Kitchen", playing = true, members = setOf("L", "m"))
         val member = room("m")
         val free = room("f")
         val players = listOf(leader, member, free)
         val bound = boundLeaders(players)
         assertEquals("Kitchen", groupLeaderName(member, players, bound))
-        assertTrue(cardTapsIgnored(groupLeaderName(member, players, bound)))
-        assertTrue(!cardTapsIgnored(groupLeaderName(free, players, bound)))
         assertEquals(listOf("L"), playingRoomIds(players, bound))
         assertEquals(listOf("m"), membersOf(leader, players, bound).map { it.playerId })
+    }
+
+    @Test
+    fun aTapOnACardSelectsItsGroupLeaderOrItself() {
+        val leader = room("L", "Kitchen", playing = true, members = setOf("L", "m"))
+        val member = room("m")
+        val free = room("f")
+        val bound = boundLeaders(listOf(leader, member, free))
+        assertEquals("L", cardTapTarget(member, bound, unavailable = false))
+        assertEquals("f", cardTapTarget(free, bound, unavailable = false))
+        assertNull(cardTapTarget(free, bound, unavailable = true))
+        assertNull(cardTapTarget(member, bound, unavailable = true))
     }
 
     @Test
