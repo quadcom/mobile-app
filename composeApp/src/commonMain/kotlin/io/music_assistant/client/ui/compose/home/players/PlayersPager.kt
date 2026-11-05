@@ -782,9 +782,25 @@ private fun ExpandedPlayerPage(
                                 },
                                 tint = controlTint,
                             )
+                            val onVolumeChange = rememberVolumeChange(
+                                volume = { currentVolume },
+                                set = { currentVolume = it },
+                            )
+                            val onVolumeChangeFinished = {
+                                playerAction(
+                                    player,
+                                    if (player.childrenBinds.none { it.isBound }) {
+                                        PlayerAction.VolumeSet(currentVolume.toDouble())
+                                    } else {
+                                        PlayerAction.GroupVolumeSet(currentVolume.toDouble())
+                                    },
+                                )
+                            }
                             VolumeSliderBox(
                                 modifier = Modifier.weight(1f),
                                 volume = { currentVolume },
+                                onValueChange = onVolumeChange,
+                                onValueChangeFinished = onVolumeChangeFinished,
                                 onStepDown = {
                                     playerAction(
                                         player,
@@ -810,19 +826,8 @@ private fun ExpandedPlayerPage(
                                     modifier = Modifier.fillMaxWidth(),
                                     value = currentVolume,
                                     valueRange = 0f..100f,
-                                    onValueChange = {
-                                        currentVolume = it
-                                    },
-                                    onValueChangeFinished = {
-                                        playerAction(
-                                            player,
-                                            if (player.childrenBinds.none { it.isBound }) {
-                                                PlayerAction.VolumeSet(currentVolume.toDouble())
-                                            } else {
-                                                PlayerAction.GroupVolumeSet(currentVolume.toDouble())
-                                            },
-                                        )
-                                    },
+                                    onValueChange = onVolumeChange,
+                                    onValueChangeFinished = onVolumeChangeFinished,
                                     thumb = {
                                         SliderDefaults.Thumb(
                                             interactionSource = remember { MutableInteractionSource() },
