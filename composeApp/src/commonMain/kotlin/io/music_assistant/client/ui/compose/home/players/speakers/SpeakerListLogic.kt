@@ -184,11 +184,27 @@ internal fun permanentGroupRooms(players: List<PlayerData>): Set<String> {
     return groups.flatMapTo(mutableSetOf()) { it.player.groupMembers.orEmpty() } - groupIds
 }
 
-/** Rooms the group editor offers: those the leader can group with, never the leader or the phone. */
+/**
+ * Rooms the group editor offers: those the leader can group with, and the leader itself (its card
+ * takes it out of its own group). Never the phone.
+ */
 internal fun offeredRooms(leader: PlayerData, players: List<PlayerData>): List<PlayerData> {
     val ids = leader.childrenBinds.mapTo(mutableSetOf()) { it.id }
-    return players.filter { it.playerId in ids && it.playerId != leader.playerId && !it.isLocal }
+    return players.filter { (it.playerId in ids || it.playerId == leader.playerId) && !it.isLocal }
 }
+
+/**
+ * The room that leads the group once [oldLeaderId] has left it: another player whose member list holds
+ * one of [oldMembers] besides itself (a room that merely went solo lists only itself). Null while the
+ * server has not moved the group yet, or when no group remains.
+ */
+internal fun successorLeader(
+    oldLeaderId: String,
+    oldMembers: Set<String>,
+    players: List<PlayerData>,
+): String? = players.firstOrNull { p ->
+    p.playerId != oldLeaderId && p.player.groupMembers.orEmpty().any { it != p.playerId && it in oldMembers }
+}?.playerId
 
 internal fun editorTag(
     room: PlayerData,

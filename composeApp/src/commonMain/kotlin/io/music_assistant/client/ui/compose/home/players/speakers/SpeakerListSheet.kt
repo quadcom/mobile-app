@@ -112,6 +112,28 @@ fun SpeakerListSheet(
 
     var editorFor by remember { mutableStateOf<String?>(null) }
     var phoneTimingFor by remember { mutableStateOf<String?>(null) }
+    // Set when the editor's leader is taken out: its id and the rooms that were in the group.
+    var leaving by remember { mutableStateOf<Pair<String, Set<String>>?>(null) }
+    // The server picks the new leader a moment later; the editor and the active room follow it.
+    LaunchedEffect(players, leaving) {
+        val (oldId, oldMembers) = leaving ?: return@LaunchedEffect
+        val next = successorLeader(oldId, oldMembers, players)
+        val stillLeads = players.byId(oldId)?.player?.groupMembers.orEmpty().any { it != oldId }
+        when {
+            next != null -> {
+                editorFor = next
+                if (activeId == oldId) onMoveToPlayer(next)
+                leaving = null
+            }
+            // No group remains, so there is nothing left to edit. With one room left, the server moved the
+            // music to it, so the active room follows it there.
+            !stillLeads -> {
+                oldMembers.singleOrNull()?.takeIf { activeId == oldId }?.let(onMoveToPlayer)
+                editorFor = null
+                leaving = null
+            }
+        }
+    }
     val listState = rememberLazyListState()
 
     ModalBottomSheet(
@@ -210,6 +232,7 @@ fun SpeakerListSheet(
                                 active = id == activeId,
                                 onSelect = { onMoveToPlayer(id) },
                                 onOpenGroupEditor = { editorFor = id },
+                                onPlayPause = { onPlayerAction(id, PlayerAction.TogglePlayPause) },
                                 groupColour = groupColour,
                             )
                             if (groupCards.isNotEmpty()) {
@@ -260,7 +283,12 @@ fun SpeakerListSheet(
                 locations = locations,
                 grouping = grouping,
                 colours = colours,
-                onPlayerAction = onPlayerAction,
+                onPlayerAction = { id, action ->
+                    if (action is PlayerAction.LeaveGroup) {
+                        leaving = id to bound.filterValues { it == id }.keys
+                    }
+                    onPlayerAction(id, action)
+                },
                 canLeaveGroup = canLeaveGroup,
                 onDismissRequest = { editorFor = null },
             )

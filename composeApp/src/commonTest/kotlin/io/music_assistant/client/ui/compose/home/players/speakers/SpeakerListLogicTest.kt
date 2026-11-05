@@ -139,7 +139,29 @@ class SpeakerListLogicTest {
         val leader = room("L", canGroup = listOf("a"))
         val a = room("a")
         val b = room("b")
-        assertEquals(listOf("a"), offeredRooms(leader, listOf(leader, a, b)).map { it.playerId })
+        assertEquals(listOf("L", "a"), offeredRooms(leader, listOf(leader, a, b)).map { it.playerId })
+    }
+
+    @Test
+    fun theLeaderIsOfferedEvenWhenItCannotGroupWithItself() {
+        val leader = room("L")
+        assertEquals(listOf("L"), offeredRooms(leader, listOf(leader)).map { it.playerId })
+    }
+
+    @Test
+    fun successorIsTheRoomNowHoldingTheOldMembers() {
+        val old = room("L", members = setOf("L", "a", "b"))
+        val next = room("a", members = setOf("a", "b"))
+        val other = room("z", members = setOf("z", "y"))
+        assertEquals("a", successorLeader("L", setOf("a", "b"), listOf(old, next, other)))
+    }
+
+    @Test
+    fun noSuccessorWhileTheOldLeaderStillHoldsTheGroupOrNoneRemains() {
+        val old = room("L", members = setOf("L", "a", "b"))
+        assertNull(successorLeader("L", setOf("a", "b"), listOf(old, room("a"), room("b"))))
+        // A room that merely went solo lists only itself.
+        assertNull(successorLeader("L", setOf("a"), listOf(room("L"), room("a", members = setOf("a")))))
     }
 
     private fun floor(vararg rooms: PlayerData, other: Boolean = false) =

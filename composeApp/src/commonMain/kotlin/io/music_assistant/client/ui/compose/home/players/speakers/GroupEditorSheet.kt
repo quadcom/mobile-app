@@ -5,7 +5,6 @@ package io.music_assistant.client.ui.compose.home.players.speakers
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,13 +14,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -35,7 +32,6 @@ import musicassistantclient.composeapp.generated.resources.Res
 import musicassistantclient.composeapp.generated.resources.speakers_add_all
 import musicassistantclient.composeapp.generated.resources.speakers_group_hint
 import musicassistantclient.composeapp.generated.resources.speakers_group_with
-import musicassistantclient.composeapp.generated.resources.speakers_leave_group
 import musicassistantclient.composeapp.generated.resources.speakers_playing
 import musicassistantclient.composeapp.generated.resources.speakers_remove_all
 import musicassistantclient.composeapp.generated.resources.speakers_this_room
@@ -63,7 +59,9 @@ internal fun GroupEditorSheet(
     val offered = remember(leader, players, bound) {
         val hidden = permanentGroupRooms(players)
         offeredRooms(leader, players).filter {
-            it.playerId !in hidden && (it.player.isAvailable || bound[it.playerId] == leader.playerId)
+            it.playerId !in hidden && (
+                it.player.isAvailable || it.playerId == leader.playerId || bound[it.playerId] == leader.playerId
+            )
         }
     }
     val sections = remember(offered, locations, grouping) { speakerSections(offered, locations, grouping) }
@@ -102,23 +100,6 @@ internal fun GroupEditorSheet(
                 )
             }
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                item(key = "this-room") {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        RoomCard(player = leader, tag = thisRoom, tagAlpha = 0.6f)
-                        // The leader leaves via `ungroup`, not `set_members`: the server picks the
-                        // successor and moves the queue there. Older servers stop the music instead.
-                        if (canLeaveGroup && leader.player.canLeaveOwnGroup) {
-                            OutlinedButton(onClick = {
-                                onPlayerAction(leader.playerId, PlayerAction.LeaveGroup)
-                                onDismissRequest()
-                            }) { Text(stringResource(Res.string.speakers_leave_group)) }
-                        }
-                    }
-                }
                 floorSectionItems(
                     sections,
                     headingAction = { section ->
@@ -133,7 +114,8 @@ internal fun GroupEditorSheet(
                         }
                     },
                 ) { room ->
-                    val inGroup = bound[room.playerId] == leader.playerId
+                    val isLeader = room.playerId == leader.playerId
+                    val inGroup = isLeader || bound[room.playerId] == leader.playerId
                     // A room in any group shows that group's colour line and word; others keep the old tag.
                     val roomColour = colourOf(room.playerId, bound, colours)
                     val tag = roomColour?.word() ?: when (val t = editorTag(room, leader, players)) {
@@ -143,8 +125,13 @@ internal fun GroupEditorSheet(
                         EditorTag.None -> null
                     }
                     // A permanent member cannot be taken out.
-                    val locked = inGroup &&
-                        leader.childrenBinds.firstOrNull { it.id == room.playerId }?.isManageable == false
+                    val locked = if (isLeader) {
+                        // The leader leaves via `ungroup`, not `set_members`: the server picks the
+                        // successor and moves the queue there. Older servers stop the music instead.
+                        !(canLeaveGroup && leader.player.canLeaveOwnGroup)
+                    } else {
+                        inGroup && leader.childrenBinds.firstOrNull { it.id == room.playerId }?.isManageable == false
+                    }
                     RoomCard(
                         player = room,
                         highlighted = inGroup,
@@ -157,10 +144,10 @@ internal fun GroupEditorSheet(
                             {
                                 onPlayerAction(
                                     leader.playerId,
-                                    if (inGroup) {
-                                        PlayerAction.GroupManage(toRemove = listOf(room.playerId))
-                                    } else {
-                                        PlayerAction.GroupManage(toAdd = listOf(room.playerId))
+                                    when {
+                                        isLeader -> PlayerAction.LeaveGroup
+                                        inGroup -> PlayerAction.GroupManage(toRemove = listOf(room.playerId))
+                                        else -> PlayerAction.GroupManage(toAdd = listOf(room.playerId))
                                     },
                                 )
                             }
