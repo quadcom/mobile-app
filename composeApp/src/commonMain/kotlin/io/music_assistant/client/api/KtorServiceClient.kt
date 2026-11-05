@@ -47,6 +47,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -508,6 +510,18 @@ class KtorServiceClient(
     init {
         startNetworkObserver()
         startClientCertificateObserver()
+        // A socket opened while the server restarts can stay open without ever sending
+        // `server/hello`; nothing else times that out, so reconnect when the wait runs long.
+        launch {
+            _sessionState
+                .map {
+                    it is SessionState.Connected && it.dataConnectionState == DataConnectionState.AwaitingServerInfo
+                }
+                .onStuckFor(SERVER_INFO_TIMEOUT_MS) {
+                    logger.w { "No server/hello in ${SERVER_INFO_TIMEOUT_MS / 1000} s — reconnecting" }
+                    reconnectFromCurrent("no server/hello")
+                }
+        }
         launch {
             isReadyForCommands.collect { ready ->
                 logger.i { "isReadyForCommands=$ready" }
@@ -1061,7 +1075,8 @@ class KtorServiceClient(
      *   - User-intent states (`Disconnected.ByUser`, `NoServerData`,
      *     `AwaitingAuth(LoggedOut)`) are NOT auto-recovered — the user opted out.
      *   - In-flight states (`Connecting`, `Reconnecting`, `AwaitingAuth(InProgress)`,
-     *     `AwaitingServerInfo`) are left to complete on their own.
+     *     `AwaitingServerInfo`) are left to complete on their own; a missing `server/hello` is
+     *     bounded by the watchdog in `init`, which reconnects after [SERVER_INFO_TIMEOUT_MS].
      *
      * Returns false if not ready within the timeout — callers should fail their
      * request with a clear "not connected/not authenticated" result.
@@ -1253,6 +1268,9 @@ class KtorServiceClient(
     companion object {
         private const val ENSURE_READY_TIMEOUT_MS = 10_000L
 
+        // How long a connected session may wait for `server/hello` before it reconnects.
+        private const val SERVER_INFO_TIMEOUT_MS = 15_000L
+
         // Upper bound on a single connect attempt before it's declared stuck. Generous
         // enough to cover a healthy cold-start handshake (incl. WebRTC signaling + ICE)
         // so it never trips a merely-slow connect, but bounded so `Connecting` can't wedge.
@@ -1279,3 +1297,15 @@ class KtorServiceClient(
         private const val IMAGEPROXY_SIZE = ARTWORK_DECODE_SIZE
     }
 }
+
+/**
+ * Calls [onStuck] when this flow stays `true` for [timeoutMs]; any change cancels the pending timer.
+ * Fires once per stretch, so a reconnect that leaves the state and returns to it re-arms the timer.
+ */
+internal suspend fun Flow<Boolean>.onStuckFor(timeoutMs: Long, onStuck: () -> Unit) =
+    distinctUntilChanged().collectLatest { stuck ->
+        if (stuck) {
+            delay(timeoutMs)
+            onStuck()
+        }
+    }
