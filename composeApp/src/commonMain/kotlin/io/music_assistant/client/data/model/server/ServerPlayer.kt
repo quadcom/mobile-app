@@ -52,6 +52,9 @@ data class ServerPlayer(
     @SerialName("display_name") val displayName: String = "",
     @SerialName("hidden") val hidden: Boolean? = null,
     @SerialName("hide_in_ui") val hideInUi: Boolean? = null,
+    // Newer servers send the player's "hide in UI" choice here as a list of conditions
+    // ("always", "when_off", ...) instead of the `hide_in_ui` boolean.
+    @SerialName("hide_player_in_ui") val hidePlayerInUi: List<String>? = null,
     // Nullable: distinguishes "server didn't send one" from a real value, and tolerates a
     // missing key or explicit null without failing the whole player's deserialization.
     @SerialName("icon") val icon: String? = null,
