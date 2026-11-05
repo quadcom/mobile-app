@@ -42,6 +42,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import io.music_assistant.client.data.location.GroupColour
 import io.music_assistant.client.data.model.client.PlayerData
 import io.music_assistant.client.ui.compose.home.players.iconRes
 import org.jetbrains.compose.resources.painterResource
@@ -59,7 +60,7 @@ internal const val BACKGROUND_ICON_ALPHA = 0.08f
 /**
  * A 78dp square room card. [highlighted] is the group editor's "in this group" look (fill, border
  * and check fade in place); [dimmed] is a room bound into a group elsewhere. [tag] sits on the top
- * edge; null hides it. A null [onClick] makes the card inert.
+ * edge; null hides it. [groupColour] draws a 3dp line in that colour along the top edge. A null [onClick] makes the card inert.
  */
 @Composable
 internal fun RoomCard(
@@ -69,6 +70,7 @@ internal fun RoomCard(
     dimmed: Boolean = false,
     tag: String? = null,
     tagAlpha: Float = 0.4f,
+    groupColour: GroupColour? = null,
     onClick: (() -> Unit)? = null,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -145,6 +147,12 @@ internal fun RoomCard(
                     autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = 14.sp, stepSize = 0.5.sp),
                 )
             }
+        }
+        // Inside the clipped box, so the line follows the card's rounded corners.
+        groupColour?.let {
+            Box(
+                Modifier.align(Alignment.TopCenter).fillMaxWidth().height(3.dp).background(Color(it.argb)),
+            )
         }
         Icon(
             imageVector = Icons.Default.CheckCircle,

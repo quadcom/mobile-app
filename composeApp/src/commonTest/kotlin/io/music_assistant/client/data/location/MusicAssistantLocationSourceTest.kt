@@ -33,4 +33,21 @@ class MusicAssistantLocationSourceTest {
     fun areaGroupingIsRecognised() {
         assertEquals(SpeakerGrouping.AREA, decodePlayerLocations("""{"grouping": "area", "players": {}}""").first)
     }
+
+    @Test
+    fun decodesGroupColours() {
+        val json = """{"players": {}, "group_colours": {"p1": "orange", "p2": "Teal"}}"""
+        assertEquals(mapOf("p1" to GroupColour.ORANGE, "p2" to GroupColour.TEAL), decodeGroupColours(json))
+    }
+
+    @Test
+    fun absentGroupColoursAreEmpty() {
+        assertEquals(emptyMap(), decodeGroupColours("{$players}"))
+    }
+
+    @Test
+    fun unknownColourWordIsDropped() {
+        val json = """{"players": {}, "group_colours": {"p1": "mauve", "p2": "pink"}}"""
+        assertEquals(mapOf("p2" to GroupColour.PINK), decodeGroupColours(json))
+    }
 }

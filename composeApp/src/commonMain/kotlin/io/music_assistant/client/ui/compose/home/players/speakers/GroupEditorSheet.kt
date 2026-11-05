@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.music_assistant.client.data.location.GroupColour
 import io.music_assistant.client.data.location.PlayerLocation
 import io.music_assistant.client.data.location.SpeakerGrouping
 import io.music_assistant.client.data.model.client.PlayerData
@@ -52,6 +53,7 @@ internal fun GroupEditorSheet(
     players: List<PlayerData>,
     locations: Map<String, PlayerLocation>,
     grouping: SpeakerGrouping,
+    colours: Map<String, GroupColour>,
     onPlayerAction: (String, PlayerAction) -> Unit,
     canLeaveGroup: Boolean,
     onDismissRequest: () -> Unit,
@@ -87,7 +89,8 @@ internal fun GroupEditorSheet(
         ) {
             Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp)) {
                 Text(
-                    text = stringResource(Res.string.speakers_group_with, leader.player.name),
+                    text = colours[leader.playerId]?.word()
+                        ?: stringResource(Res.string.speakers_group_with, leader.player.name),
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Text(
@@ -130,7 +133,9 @@ internal fun GroupEditorSheet(
                     },
                 ) { room ->
                     val inGroup = bound[room.playerId] == leader.playerId
-                    val tag = when (val t = editorTag(room, leader, players)) {
+                    // A room in any group shows that group's colour line and word; others keep the old tag.
+                    val roomColour = colourOf(room.playerId, bound, colours)
+                    val tag = roomColour?.word() ?: when (val t = editorTag(room, leader, players)) {
                         is EditorTag.Named -> t.name
                         EditorTag.Playing -> playingText
                         EditorTag.ThisRoom -> thisRoom
@@ -144,6 +149,7 @@ internal fun GroupEditorSheet(
                         highlighted = inGroup,
                         tag = tag,
                         tagAlpha = 0.6f,
+                        groupColour = roomColour,
                         onClick = if (locked) {
                             null
                         } else {

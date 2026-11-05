@@ -54,6 +54,7 @@ import dev.chrisbanes.haze.rememberHazeState
 import io.music_assistant.client.api.DeepLinkBus
 import io.music_assistant.client.api.DeepLinkDestination
 import io.music_assistant.client.api.ErrorMessageBus
+import io.music_assistant.client.data.location.PlayerLocationSource
 import io.music_assistant.client.data.model.client.ClickContext
 import io.music_assistant.client.data.model.client.MediaType
 import io.music_assistant.client.data.model.client.items.Album
@@ -90,6 +91,9 @@ import io.music_assistant.client.ui.compose.home.players.rememberHideUnavailable
 import io.music_assistant.client.ui.compose.home.players.rememberToggleHideUnavailablePlayers
 import io.music_assistant.client.ui.compose.home.players.speakers.LocalSheetHazeState
 import io.music_assistant.client.ui.compose.home.players.speakers.SpeakerListSheet
+import io.music_assistant.client.ui.compose.home.players.speakers.boundLeaders
+import io.music_assistant.client.ui.compose.home.players.speakers.groupColours
+import io.music_assistant.client.ui.compose.home.players.speakers.word
 import io.music_assistant.client.ui.compose.item.ItemDetailsScreen
 import io.music_assistant.client.ui.compose.item.ItemDetailsViewModel
 import io.music_assistant.client.ui.compose.item.ItemListScreen
@@ -168,6 +172,12 @@ fun MainNavigationRoot(
     val playersState by homeScreenViewModel.playersState.collectAsStateWithLifecycle()
     // Single pager state used across all views
     val data = playersState as? HomeScreenViewModel.PlayersState.Data
+    // The colour of the group the selected room leads, for the player bar button (null when it leads none).
+    val serverGroupColours by koinInject<PlayerLocationSource>().groupColours.collectAsStateWithLifecycle()
+    val selectedGroupColour = remember(data?.allPlayerData, data?.selectedPlayer?.playerId, serverGroupColours) {
+        val all = data?.allPlayerData.orEmpty()
+        groupColours(all, boundLeaders(all), serverGroupColours)[data?.selectedPlayer?.playerId]
+    }
     val playerPagerState = rememberPagerState(
         initialPage = data?.selectedPlayerIndex ?: 0,
         pageCount = { data?.playerData?.size ?: 0 },
@@ -350,7 +360,7 @@ fun MainNavigationRoot(
                         selected = false,
                         onClick = { showPlayerSelection = true },
                         icon = vectorResource(selectedPlayer.iconRes()),
-                        label = selectedPlayer.label(),
+                        label = selectedGroupColour?.word() ?: selectedPlayer.label(),
                         marqueeLabel = true,
                         contentDescription = selectedPlayer.contentDescription(),
                     )

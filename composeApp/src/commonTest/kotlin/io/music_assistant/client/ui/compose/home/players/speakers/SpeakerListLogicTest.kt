@@ -1,5 +1,6 @@
 package io.music_assistant.client.ui.compose.home.players.speakers
 
+import io.music_assistant.client.data.location.GroupColour
 import io.music_assistant.client.data.location.PlayerLocation
 import io.music_assistant.client.data.location.SpeakerGrouping
 import io.music_assistant.client.data.model.client.PlayerData
@@ -241,5 +242,45 @@ class SpeakerListLogicTest {
     fun noLocationsGivesOnePlainSectionForAnyGrouping() {
         val sections = speakerSections(groupingRooms, emptyMap(), SpeakerGrouping.LABEL)
         assertEquals(listOf("all"), sections.map { it.key })
+    }
+
+    private fun groupOf(leader: String, vararg members: String) =
+        listOf(room(leader, members = setOf(leader, *members))) + members.map { room(it) }
+
+    @Test
+    fun serverColourIsKept() {
+        val players = groupOf("a", "x")
+        val colours = groupColours(players, boundLeaders(players), mapOf("a" to GroupColour.TEAL))
+        assertEquals(mapOf("a" to GroupColour.TEAL), colours)
+    }
+
+    @Test
+    fun fallbackTakesLowestFreeColoursInLeaderNameOrder() {
+        val players = groupOf("b", "x") + groupOf("a", "y") + groupOf("c", "z")
+        val colours = groupColours(players, boundLeaders(players), mapOf("c" to GroupColour.ORANGE))
+        assertEquals(GroupColour.ORANGE, colours["c"])
+        assertEquals(GroupColour.PURPLE, colours["a"])
+        assertEquals(GroupColour.GREEN, colours["b"])
+    }
+
+    @Test
+    fun fallbackWrapsAfterSixGroups() {
+        val ids = listOf("a", "b", "c", "d", "e", "f", "g")
+        val players = ids.flatMap { groupOf(it, "m$it") }
+        val colours = groupColours(players, boundLeaders(players), emptyMap())
+        assertEquals(7, colours.size)
+        assertEquals(GroupColour.ORANGE, colours["a"])
+        assertEquals(GroupColour.TEAL, colours["f"])
+        assertEquals(GroupColour.entries.first(), colours["g"])
+    }
+
+    @Test
+    fun aMemberTakesItsLeadersColourAndALoneRoomHasNone() {
+        val players = groupOf("a", "x") + room("solo")
+        val bound = boundLeaders(players)
+        val colours = groupColours(players, bound, emptyMap())
+        assertEquals(GroupColour.ORANGE, colourOf("x", bound, colours))
+        assertEquals(GroupColour.ORANGE, colourOf("a", bound, colours))
+        assertNull(colourOf("solo", bound, colours))
     }
 }

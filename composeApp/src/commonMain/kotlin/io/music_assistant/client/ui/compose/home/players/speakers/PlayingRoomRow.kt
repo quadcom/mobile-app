@@ -3,6 +3,7 @@
 
 package io.music_assistant.client.ui.compose.home.players.speakers
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -27,9 +28,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.music_assistant.client.data.location.GroupColour
 import io.music_assistant.client.data.model.client.PlayerData
 import io.music_assistant.client.data.model.client.qualityTier
 import io.music_assistant.client.ui.compose.common.icons.NowPlayingIcon
@@ -56,6 +60,7 @@ internal fun PlayingRoomRow(
     onSelect: () -> Unit,
     onOpenGroupEditor: () -> Unit,
     modifier: Modifier = Modifier,
+    groupColour: GroupColour? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     val media = item.player.currentMedia
@@ -75,6 +80,20 @@ internal fun PlayingRoomRow(
             .let { if (active) it.border(1.dp, colors.primary, shape) else it }
             .clickable(onClick = onSelect),
     ) {
+        // Right angle at the corner; the row's clip trims it to the rounded shape.
+        groupColour?.let { colour ->
+            Canvas(Modifier.align(Alignment.TopEnd).size(30.dp)) {
+                drawPath(
+                    Path().apply {
+                        moveTo(0f, 0f)
+                        lineTo(size.width, 0f)
+                        lineTo(size.width, size.height)
+                        close()
+                    },
+                    Color(colour.argb),
+                )
+            }
+        }
         Icon(
             painter = painterResource(item.iconRes()),
             contentDescription = null,
@@ -91,7 +110,7 @@ internal fun PlayingRoomRow(
                 .padding(start = 16.dp, end = 52.dp, top = 10.dp, bottom = 12.dp),
         ) {
             Text(
-                text = item.player.name,
+                text = groupColour?.word() ?: item.player.name,
                 fontSize = 16.sp,
                 lineHeight = 22.sp,
                 fontWeight = FontWeight.Medium,
@@ -156,7 +175,9 @@ internal fun PlayingRoomRow(
         if (active) {
             Text(
                 text = stringResource(Res.string.speakers_active),
-                modifier = Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 14.dp),
+                // Clear of the group's colour triangle in the same corner.
+                modifier = Modifier.align(Alignment.TopEnd)
+                    .padding(top = 6.dp, end = if (groupColour != null) 36.dp else 14.dp),
                 fontSize = 12.sp,
                 lineHeight = 16.sp,
                 fontWeight = FontWeight.Medium,

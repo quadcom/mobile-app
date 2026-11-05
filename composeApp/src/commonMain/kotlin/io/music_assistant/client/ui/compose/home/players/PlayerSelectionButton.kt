@@ -33,6 +33,7 @@ fun PlayerSelectionButton(
     controlTint: Color = MaterialTheme.colorScheme.primary,
     sendSpinState: PlayerState?,
     onSelectPlayer: () -> Unit = {},
+    labelOverride: String? = null,
 ) {
     val isLocalPlayer = player.isLocal
     val dotColor = (if (isLocalPlayer) sendSpinState else null)?.toDotColor()
@@ -50,6 +51,7 @@ fun PlayerSelectionButton(
             player = player,
             controlTint = controlTint,
             dotColor = dotColor,
+            labelOverride = labelOverride,
         )
     }
 }
@@ -59,6 +61,7 @@ private fun PlayerButtonContent(
     player: PlayerData,
     controlTint: Color,
     dotColor: Color?,
+    labelOverride: String?,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -79,7 +82,7 @@ private fun PlayerButtonContent(
             )
         }
 
-        val playerLabel = player.label()
+        val playerLabel = labelOverride ?: player.label()
 
         Text(
             text = playerLabel,

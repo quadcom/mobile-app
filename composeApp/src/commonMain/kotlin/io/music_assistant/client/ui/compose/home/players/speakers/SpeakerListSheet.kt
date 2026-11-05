@@ -48,6 +48,7 @@ import io.music_assistant.client.data.model.client.byId
 import io.music_assistant.client.ui.compose.common.OverflowMenuButton
 import io.music_assistant.client.ui.compose.common.OverflowMenuOption
 import io.music_assistant.client.ui.compose.common.action.PlayerAction
+import kotlinx.coroutines.delay
 import musicassistantclient.composeapp.generated.resources.Res
 import musicassistantclient.composeapp.generated.resources.cd_more
 import musicassistantclient.composeapp.generated.resources.player_unavailable
@@ -60,6 +61,9 @@ import org.koin.compose.koinInject
 
 /** How long a room takes to fade into or out of the top rows. */
 private const val TOP_ROW_ANIM_MS = 1500
+
+/** Waits for a burst of membership updates to settle before the colours are read again. */
+private const val LOCATION_REFRESH_DELAY_MS = 1000L
 
 /**
  * The speaker list: a row per playing room (plus the active one) on top, then every other room as
@@ -85,10 +89,19 @@ fun SpeakerListSheet(
     val locationSource = koinInject<PlayerLocationSource>()
     val locations by locationSource.locations.collectAsStateWithLifecycle()
     val grouping by locationSource.grouping.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit) { locationSource.refresh() }
+    val serverColours by locationSource.groupColours.collectAsStateWithLifecycle()
 
     val activeId = selectedPlayer.playerId
     val bound = remember(players) { boundLeaders(players) }
+    val colours = remember(players, bound, serverColours) { groupColours(players, bound, serverColours) }
+    // Read on open, then again a second after the group membership changes: the server colours a new
+    // group when it forms, and the answer only arrives when asked for.
+    var firstRead by remember { mutableStateOf(true) }
+    LaunchedEffect(bound) {
+        if (!firstRead) delay(LOCATION_REFRESH_DELAY_MS)
+        firstRead = false
+        locationSource.refresh()
+    }
     val order = remember(players, topOrder, activeId) {
         nextTopOrder(topOrder, playingRoomIds(players, bound), activeId)
             .filter { id -> players.any { it.playerId == id } }
@@ -150,12 +163,13 @@ fun SpeakerListSheet(
             val unavailableText = stringResource(Res.string.player_unavailable)
 
             val card: @Composable (PlayerData) -> Unit = { room ->
-                val leaderName = groupLeaderName(room, players, bound)
+                val groupColour = colourOf(room.playerId, bound, colours)
                 val unavailable = !room.player.isSelectable
                 RoomCard(
                     player = room,
-                    dimmed = leaderName != null || unavailable,
-                    tag = leaderName ?: unavailableText.takeIf { unavailable },
+                    dimmed = groupColour != null || unavailable,
+                    tag = groupColour?.word() ?: unavailableText.takeIf { unavailable },
+                    groupColour = groupColour,
                     // The phone's card always opens its timing panel: timing matters most while it is grouped.
                     onClick = when {
                         room.isLocal -> ({ phoneTimingFor = room.playerId })
@@ -168,7 +182,10 @@ fun SpeakerListSheet(
                 items(order, key = { "top:$it" }) { id ->
                     val row = players.byId(id)
                     if (row != null) {
+                        val groupColour = colours[id]
                         val members = membersOf(row, players, bound).filter { it.playerId !in topIds }
+                        // The leader is a card too, first, so every speaker in the group shows.
+                        val groupCards = if (groupColour != null) listOf(row) + members else members
                         Column(
                             // Rooms fade in and out of the top over 1.5 s (Adrian, 2026-11-05), and the
                             // rows below glide to their new place over the same time.
@@ -187,13 +204,16 @@ fun SpeakerListSheet(
                                 active = id == activeId,
                                 onSelect = { onMoveToPlayer(id) },
                                 onOpenGroupEditor = { editorFor = id },
+                                groupColour = groupColour,
                             )
-                            if (members.isNotEmpty()) {
+                            if (groupCards.isNotEmpty()) {
                                 RoomGrid(Modifier.padding(start = 16.dp)) {
-                                    members.forEach { member ->
+                                    groupCards.forEach { member ->
                                         key(member.playerId) {
                                             RoomCard(
                                                 player = member,
+                                                tag = groupColour?.word(),
+                                                groupColour = groupColour,
                                                 onClick = if (member.isLocal) ({ phoneTimingFor = member.playerId }) else null,
                                             )
                                         }
@@ -233,6 +253,7 @@ fun SpeakerListSheet(
                 players = players,
                 locations = locations,
                 grouping = grouping,
+                colours = colours,
                 onPlayerAction = onPlayerAction,
                 canLeaveGroup = canLeaveGroup,
                 onDismissRequest = { editorFor = null },

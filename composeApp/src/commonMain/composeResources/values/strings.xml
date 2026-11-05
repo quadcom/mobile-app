@@ -366,6 +366,12 @@
   <string name="speakers_group_with">Group with %1$s</string>
   <string name="speakers_group_hint">Tap a room to add it or take it out</string>
   <string name="speakers_leave_group">Leave group</string>
+  <string name="speakers_colour_orange">Orange</string>
+  <string name="speakers_colour_purple">Purple</string>
+  <string name="speakers_colour_green">Green</string>
+  <string name="speakers_colour_pink">Pink</string>
+  <string name="speakers_colour_yellow">Yellow</string>
+  <string name="speakers_colour_teal">Teal</string>
   <string name="speakers_phone_timing_title">This phone</string>
   <string name="speakers_phone_timing_hint">If this phone plays ahead of or behind the other rooms, nudge its timing until they line up.</string>
   <string name="speakers_control_phone">Control this phone</string>

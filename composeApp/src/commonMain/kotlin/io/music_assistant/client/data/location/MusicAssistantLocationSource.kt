@@ -20,6 +20,7 @@ import kotlinx.serialization.Serializable
 private data class LocationsReply(
     val grouping: String? = null,
     val players: Map<String, LocationDto> = emptyMap(),
+    @SerialName("group_colours") val groupColours: Map<String, String> = emptyMap(),
 )
 
 @Serializable
@@ -44,6 +45,12 @@ internal fun decodePlayerLocations(json: String): Pair<SpeakerGrouping, Map<Stri
     }
 }
 
+/** Decodes the optional `group_colours` of the same reply; absent or unknown colour words are dropped. */
+internal fun decodeGroupColours(json: String): Map<String, GroupColour> =
+    myJson.decodeFromString<LocationsReply>(json).groupColours.mapNotNull { (leader, word) ->
+        GroupColour.fromWire(word)?.let { leader to it }
+    }.toMap()
+
 /** Reads player locations from the Music Assistant server; the last good reply is cached in settings. */
 class MusicAssistantLocationSource(
     private val apiClient: ServiceClient,
@@ -55,7 +62,11 @@ class MusicAssistantLocationSource(
     private val cached = runCatching { decodePlayerLocations(settings.playerLocationsJson) }.getOrNull()
     private val _grouping = MutableStateFlow(cached?.first ?: SpeakerGrouping.NONE)
     private val _locations = MutableStateFlow(cached?.second.orEmpty())
+    private val _groupColours = MutableStateFlow(
+        runCatching { decodeGroupColours(settings.playerLocationsJson) }.getOrDefault(emptyMap()),
+    )
     override val grouping: StateFlow<SpeakerGrouping> = _grouping
+    override val groupColours: StateFlow<Map<String, GroupColour>> = _groupColours
     override val locations: StateFlow<Map<String, PlayerLocation>> = _locations
 
     private var job: Job? = null
@@ -70,6 +81,7 @@ class MusicAssistantLocationSource(
                 val (newGrouping, newLocations) = decodePlayerLocations(json)
                 _grouping.value = newGrouping
                 _locations.value = newLocations
+                _groupColours.value = decodeGroupColours(json)
                 settings.playerLocationsJson = json
             } catch (e: CancellationException) {
                 // A timeout is a failed read; any other cancellation must reach the scope.

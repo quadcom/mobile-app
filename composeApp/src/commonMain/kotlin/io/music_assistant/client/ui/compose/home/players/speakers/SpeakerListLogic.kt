@@ -1,5 +1,6 @@
 package io.music_assistant.client.ui.compose.home.players.speakers
 
+import io.music_assistant.client.data.location.GroupColour
 import io.music_assistant.client.data.location.PlayerLocation
 import io.music_assistant.client.data.location.SpeakerGrouping
 import io.music_assistant.client.data.model.client.PlayerData
@@ -64,6 +65,34 @@ internal fun nextTopOrder(
     val keep = previous.filter { it in playingIds || it == activeId }
     return keep + (playingIds + activeId).filter { it !in keep }.distinct()
 }
+
+/**
+ * The colour of each group, keyed by leader id. A leader the server coloured keeps that colour; the
+ * rest (the server sends none yet, or has not seen a new group) take the lowest colours still free,
+ * in leader-name order, wrapping after the last colour.
+ */
+internal fun groupColours(
+    players: List<PlayerData>,
+    bound: Map<String, String>,
+    server: Map<String, GroupColour>,
+): Map<String, GroupColour> {
+    val leaders = bound.values.toSet()
+    val result = leaders.mapNotNull { id -> server[id]?.let { id to it } }.toMap().toMutableMap()
+    val unset = leaders.filter { it !in result }
+        .sortedWith(compareBy({ id -> players.byId(id)?.player?.name?.lowercase().orEmpty() }, { it }))
+    unset.forEach { id ->
+        val free = GroupColour.entries.firstOrNull { it !in result.values }
+        result[id] = free ?: GroupColour.entries[result.size % GroupColour.entries.size]
+    }
+    return result
+}
+
+/** The colour of the group this room is in (its own if it leads, else its leader's), or null. */
+internal fun colourOf(
+    roomId: String,
+    bound: Map<String, String>,
+    colours: Map<String, GroupColour>,
+): GroupColour? = colours[bound[roomId] ?: roomId]
 
 /** The members bound to [leader], sorted by name. */
 internal fun membersOf(
