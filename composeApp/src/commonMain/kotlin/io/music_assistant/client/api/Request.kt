@@ -160,8 +160,10 @@ data class Request @OptIn(ExperimentalUuidApi::class) constructor(
             playerId: String,
             playersToAdd: List<String>?,
             playersToRemove: List<String>?,
+            // The speaker-list variant also accepts a permanent group's id and expands it server-side.
+            command: String = APICommands.PLAYERS_CMD_SET_MEMBERS,
         ) = Request(
-            command = APICommands.PLAYERS_CMD_SET_MEMBERS,
+            command = command,
             args = buildJsonObject {
                 put("target_player", JsonPrimitive(playerId))
                 playersToAdd?.let {

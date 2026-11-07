@@ -22,8 +22,12 @@ sealed interface PlayerAction {
 
     data class GroupToggleMute(val isMutedNow: Boolean) : PlayerAction
 
-    data class GroupManage(val toAdd: List<String>? = null, val toRemove: List<String>? = null) :
-        PlayerAction
+    data class GroupManage(
+        val toAdd: List<String>? = null,
+        val toRemove: List<String>? = null,
+        // True when the server answers `hass/speaker_list`: it can also add a permanent group as one speaker.
+        val viaSpeakerList: Boolean = false,
+    ) : PlayerAction
 
     /**
      * The player leaves its own group. On an ad-hoc sync leader the server hands the

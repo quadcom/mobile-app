@@ -118,6 +118,18 @@ class SpeakerListLogicTest {
         assertNull(successorLeader("L", setOf("a"), listOf(room("L"), room("a", members = setOf("a")))))
     }
 
+    @Test
+    fun serverLeaderBeatsALiveHiddenMemberAndNullListFallsBackToLiveData() {
+        val old = room("L", members = setOf("L", "G"))
+        // Live data names MB1, the hidden member of permanent group G; the server list shows G as one room.
+        val mb1 = room("MB1", members = setOf("MB1", "G"))
+        val live = listOf(old, mb1)
+        assertEquals("G", successorLeader("L", setOf("G"), live, serverBound = mapOf("G" to "G")))
+        assertNull(successorLeader("L", setOf("G"), live, serverBound = mapOf("G" to "L")))
+        assertNull(successorLeader("L", setOf("G"), live, serverBound = emptyMap()))
+        assertEquals("MB1", successorLeader("L", setOf("G"), live, serverBound = null))
+    }
+
     private fun floor(vararg rooms: PlayerData, other: Boolean = false) =
         FloorSection(if (other) "other" else "floor:F", if (other) null else "F", other, rooms.toList())
 

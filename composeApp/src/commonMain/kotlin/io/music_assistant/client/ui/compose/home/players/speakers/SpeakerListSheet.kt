@@ -103,10 +103,14 @@ fun SpeakerListSheet(
     // Set when the editor's leader is taken out: its id and the rooms that were in the group.
     var leaving by remember { mutableStateOf<Pair<String, Set<String>>?>(null) }
     // The server picks the new leader a moment later; the editor and the active room follow it.
-    LaunchedEffect(players, leaving) {
+    // `list` is a key so the effect waits for the server's re-read, which names the leader.
+    LaunchedEffect(players, leaving, list) {
         val (oldId, oldMembers) = leaving ?: return@LaunchedEffect
-        val next = successorLeader(oldId, oldMembers, players)
+        val next = successorLeader(oldId, oldMembers, players, list?.bound)
         val stillLeads = players.byId(oldId)?.player?.groupMembers.orEmpty().any { it != oldId }
+        // Live data drops the old leader about a second before the server's list catches up; until the list
+        // stops naming it, "no group remains" is not yet known.
+        val listMoved = list?.let { l -> oldMembers.none { l.bound[it] == oldId } } ?: true
         when {
             next != null -> {
                 editorFor = next
@@ -115,7 +119,7 @@ fun SpeakerListSheet(
             }
             // No group remains, so there is nothing left to edit. With one room left, the server moved the
             // music to it, so the active room follows it there.
-            !stillLeads -> {
+            !stillLeads && listMoved -> {
                 oldMembers.singleOrNull()?.takeIf { activeId == oldId }?.let(onMoveToPlayer)
                 editorFor = null
                 leaving = null

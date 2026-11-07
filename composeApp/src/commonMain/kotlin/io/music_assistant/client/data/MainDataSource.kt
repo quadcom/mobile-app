@@ -1207,6 +1207,11 @@ class MainDataSource(
                         playerId = playerId,
                         playersToAdd = action.toAdd,
                         playersToRemove = action.toRemove,
+                        command = if (action.viaSpeakerList) {
+                            APICommands.SPEAKER_LIST_SET_MEMBERS
+                        } else {
+                            APICommands.PLAYERS_CMD_SET_MEMBERS
+                        },
                     ),
                 )
 

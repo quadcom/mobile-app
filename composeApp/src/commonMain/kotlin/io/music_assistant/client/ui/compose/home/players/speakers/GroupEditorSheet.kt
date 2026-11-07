@@ -104,10 +104,16 @@ internal fun GroupEditorSheet(
                     headingAction = { section ->
                         when (val action = floorGroupAction(section, leader, bound)) {
                             is FloorAction.AddAll -> TextButton(onClick = {
-                                onPlayerAction(leader.playerId, PlayerAction.GroupManage(toAdd = action.ids))
+                                onPlayerAction(
+                                    leader.playerId,
+                                    PlayerAction.GroupManage(toAdd = action.ids, viaSpeakerList = list != null),
+                                )
                             }) { Text(stringResource(Res.string.speakers_add_all)) }
                             is FloorAction.RemoveAll -> TextButton(onClick = {
-                                onPlayerAction(leader.playerId, PlayerAction.GroupManage(toRemove = action.ids))
+                                onPlayerAction(
+                                    leader.playerId,
+                                    PlayerAction.GroupManage(toRemove = action.ids, viaSpeakerList = list != null),
+                                )
                             }) { Text(stringResource(Res.string.speakers_remove_all)) }
                             FloorAction.None -> Unit
                         }
@@ -145,8 +151,14 @@ internal fun GroupEditorSheet(
                                     leader.playerId,
                                     when {
                                         isLeader -> PlayerAction.LeaveGroup
-                                        inGroup -> PlayerAction.GroupManage(toRemove = listOf(room.playerId))
-                                        else -> PlayerAction.GroupManage(toAdd = listOf(room.playerId))
+                                        inGroup -> PlayerAction.GroupManage(
+                                            toRemove = listOf(room.playerId),
+                                            viaSpeakerList = list != null,
+                                        )
+                                        else -> PlayerAction.GroupManage(
+                                            toAdd = listOf(room.playerId),
+                                            viaSpeakerList = list != null,
+                                        )
                                     },
                                 )
                             }

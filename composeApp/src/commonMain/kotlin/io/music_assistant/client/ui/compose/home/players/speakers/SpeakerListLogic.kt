@@ -94,14 +94,23 @@ internal fun listSections(
  * The room that leads the group once [oldLeaderId] has left it: another player whose member list holds
  * one of [oldMembers] besides itself (a room that merely went solo lists only itself). Null while the
  * server has not moved the group yet, or when no group remains.
+ *
+ * With [serverBound] (the speaker list's room-to-leader map) the server's leader wins: live data can name a
+ * hidden member of a permanent group, which the list shows as one room under its own id. Null while the
+ * list has no leader for the old members yet.
  */
 internal fun successorLeader(
     oldLeaderId: String,
     oldMembers: Set<String>,
     players: List<PlayerData>,
-): String? = players.firstOrNull { p ->
-    p.playerId != oldLeaderId && p.player.groupMembers.orEmpty().any { it != p.playerId && it in oldMembers }
-}?.playerId
+    serverBound: Map<String, String>? = null,
+): String? = if (serverBound != null) {
+    oldMembers.firstNotNullOfOrNull { serverBound[it]?.takeIf { leader -> leader != oldLeaderId } }
+} else {
+    players.firstOrNull { p ->
+        p.playerId != oldLeaderId && p.player.groupMembers.orEmpty().any { it != p.playerId && it in oldMembers }
+    }?.playerId
+}
 
 internal fun editorTag(
     room: PlayerData,

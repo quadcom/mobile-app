@@ -1,5 +1,6 @@
 package io.music_assistant.client.data
 
+import io.music_assistant.client.api.APICommands
 import io.music_assistant.client.api.Request
 import io.music_assistant.client.data.model.client.Chapter
 import io.music_assistant.client.data.model.client.PlayerData
@@ -124,6 +125,11 @@ class PlayerRequestFactory(
                     playerId = data.playerId,
                     playersToAdd = action.toAdd,
                     playersToRemove = action.toRemove,
+                    command = if (action.viaSpeakerList) {
+                        APICommands.SPEAKER_LIST_SET_MEMBERS
+                    } else {
+                        APICommands.PLAYERS_CMD_SET_MEMBERS
+                    },
                 )
 
             PlayerAction.LeaveGroup ->
