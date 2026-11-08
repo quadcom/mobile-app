@@ -362,6 +362,14 @@
   <string name="speakers_add_all">Add all</string>
   <string name="speakers_remove_all">Remove all</string>
   <string name="speakers_this_phone">This phone</string>
+  <string name="speakers_stereo_pair">Stereo</string>
+  <string name="stereo_pair_setup">Set up stereo pair</string>
+  <string name="stereo_pair_question">Is this your left speaker?</string>
+  <string name="stereo_pair_yes">Yes</string>
+  <string name="stereo_pair_no_right">No, that's the right</string>
+  <string name="stereo_pair_play_again">Play again</string>
+  <string name="stereo_pair_pick">Which speakers?</string>
+  <string name="stereo_pair_failed">The stereo pair could not be set up. Check the connection and try again.</string>
   <string name="speakers_this_room">This room</string>
   <string name="speakers_group_with">Group with %1$s</string>
   <string name="speakers_group_hint">Tap a room to add it or take it out</string>

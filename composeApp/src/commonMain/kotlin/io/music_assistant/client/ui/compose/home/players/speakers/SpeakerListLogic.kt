@@ -2,6 +2,8 @@ package io.music_assistant.client.ui.compose.home.players.speakers
 
 import io.music_assistant.client.data.model.client.PlayerData
 import io.music_assistant.client.data.model.client.byId
+import io.music_assistant.client.data.model.server.GrantedScopes
+import io.music_assistant.client.data.speakers.PermanentGroup
 import io.music_assistant.client.data.speakers.SectionKind
 import io.music_assistant.client.data.speakers.SpeakerList
 import io.music_assistant.client.data.speakers.SpeakerRoom
@@ -157,3 +159,17 @@ internal fun floorGroupAction(
         .distinct()
     return if (removable.isNotEmpty()) FloorAction.RemoveAll(removable) else FloorAction.None
 }
+
+/**
+ * The permanent groups that can become a stereo pair: exactly two speakers, and only for a user who may
+ * configure players, because saving the pair writes the members' settings.
+ */
+internal fun stereoPairCandidates(list: SpeakerList?, scopes: GrantedScopes): List<PermanentGroup> =
+    if (scopes.canConfigurePlayers) list?.permanentGroups.orEmpty().filter { it.members.size == 2 } else emptyList()
+
+/**
+ * The speaker that gets saved as the left one. "Yes" says the speaker that just dinged is the left one;
+ * "No, that's the right" says the other member is.
+ */
+internal fun leftSpeakerFor(members: List<String>, dinged: String, isLeft: Boolean): String? =
+    if (isLeft) dinged else members.firstOrNull { it != dinged }

@@ -60,6 +60,20 @@ data class Request @OptIn(ExperimentalUuidApi::class) constructor(
 
         fun speakerList() = Request(command = APICommands.SPEAKER_LIST)
 
+        fun stereoPairIdentify(playerId: String) = Request(
+            command = APICommands.STEREO_PAIR_IDENTIFY,
+            args = buildJsonObject { put("player_id", JsonPrimitive(playerId)) },
+        )
+
+        // A null left id turns the pair off, so it is sent as JSON null rather than left out.
+        fun stereoPairSet(groupId: String, leftPlayerId: String?) = Request(
+            command = APICommands.STEREO_PAIR_SET,
+            args = buildJsonObject {
+                put("group_id", JsonPrimitive(groupId))
+                put("left_player_id", JsonPrimitive(leftPlayerId))
+            },
+        )
+
         fun simpleCommand(
             playerId: String,
             command: String,

@@ -75,6 +75,31 @@ class SpeakerListSourceTest {
         assertNull(list.colourOf("g"))
     }
 
+    @Test
+    fun decodesTheStereoPairFlagOnRoomsAndPermanentGroups() {
+        val list = decodeSpeakerList(
+            """{"rooms": {"p": {"is_stereo_pair": true}, "q": {}},
+                "permanent_groups": [
+                  {"player": "p", "name": "Bedroom", "members": ["a", "b"], "is_stereo_pair": true, "stereo_left": "a"},
+                  {"player": "r", "name": "Den", "members": ["c", "d"]}
+                ]}""",
+        )
+        assertTrue(list.rooms["p"]?.isStereoPair == true)
+        assertFalse(list.rooms["q"]?.isStereoPair == true)
+        assertEquals(
+            listOf(
+                PermanentGroup("p", "Bedroom", listOf("a", "b"), true, "a"),
+                PermanentGroup("r", "Den", listOf("c", "d")),
+            ),
+            list.permanentGroups,
+        )
+    }
+
+    @Test
+    fun aServerWithoutStereoPairsSendsNoPermanentGroups() {
+        assertTrue(decodeSpeakerList("{}").permanentGroups.isEmpty())
+    }
+
     private fun event(revision: Any?) = buildJsonObject {
         when (revision) {
             is Int -> put("revision", revision)

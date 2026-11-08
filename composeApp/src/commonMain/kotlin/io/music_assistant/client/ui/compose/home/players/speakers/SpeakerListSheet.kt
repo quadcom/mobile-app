@@ -47,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.music_assistant.client.data.model.client.PlayerData
 import io.music_assistant.client.data.model.client.byId
 import io.music_assistant.client.data.speakers.SpeakerListSource
+import io.music_assistant.client.ui.compose.common.LocalGrantedScopes
 import io.music_assistant.client.ui.compose.common.OverflowMenuButton
 import io.music_assistant.client.ui.compose.common.OverflowMenuOption
 import io.music_assistant.client.ui.compose.common.action.PlayerAction
@@ -57,6 +58,7 @@ import musicassistantclient.composeapp.generated.resources.players_hide_unavaila
 import musicassistantclient.composeapp.generated.resources.players_title
 import musicassistantclient.composeapp.generated.resources.speakers_other
 import musicassistantclient.composeapp.generated.resources.speakers_this_phone
+import musicassistantclient.composeapp.generated.resources.stereo_pair_setup
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 
@@ -98,6 +100,8 @@ fun SpeakerListSheet(
     }
     LaunchedEffect(order) { if (order != topOrder) onTopOrderChange(order) }
 
+    val stereoGroups = stereoPairCandidates(list, LocalGrantedScopes.current)
+    var stereoOpen by remember { mutableStateOf(false) }
     var editorFor by remember { mutableStateOf<String?>(null) }
     var phoneTimingFor by remember { mutableStateOf<String?>(null) }
     // Set when the editor's leader is taken out: its id and the rooms that were in the group.
@@ -159,7 +163,16 @@ fun SpeakerListSheet(
                             trailingIcon = Icons.Default.Check.takeIf { hideUnavailable },
                             onClick = onToggleHideUnavailable,
                         ),
-                    ),
+                    ) + if (stereoGroups.isEmpty()) {
+                        emptyList()
+                    } else {
+                        listOf(
+                            OverflowMenuOption(
+                                title = stringResource(Res.string.stereo_pair_setup),
+                                onClick = { stereoOpen = true },
+                            ),
+                        )
+                    },
                 ) { onClick ->
                     IconButton(onClick = onClick) {
                         Icon(
@@ -187,6 +200,7 @@ fun SpeakerListSheet(
                     dimmed = groupColour != null || unavailable,
                     tag = groupColour?.word() ?: unavailableText.takeIf { unavailable },
                     groupColour = groupColour,
+                    stereo = list?.rooms?.get(room.playerId)?.isStereoPair == true,
                     // The phone's card always opens its timing panel: timing matters most while it is grouped.
                     onClick = when {
                         room.isLocal -> ({ phoneTimingFor = room.playerId })
@@ -225,6 +239,7 @@ fun SpeakerListSheet(
                                 onOpenGroupEditor = { editorFor = id },
                                 onPlayPause = { onPlayerAction(id, PlayerAction.TogglePlayPause) },
                                 groupColour = groupColour,
+                                stereo = list?.rooms?.get(id)?.isStereoPair == true,
                             )
                             if (groupCards.isNotEmpty()) {
                                 RoomGrid(Modifier.padding(start = 16.dp)) {
@@ -234,6 +249,7 @@ fun SpeakerListSheet(
                                                 player = member,
                                                 tag = groupColour?.word(),
                                                 groupColour = groupColour,
+                                                stereo = list?.rooms?.get(member.playerId)?.isStereoPair == true,
                                                 onClick = if (member.isLocal) ({ phoneTimingFor = member.playerId }) else null,
                                             )
                                         }
@@ -282,6 +298,10 @@ fun SpeakerListSheet(
                 onDismissRequest = { editorFor = null },
             )
         }
+    }
+
+    if (stereoOpen) {
+        StereoPairDialog(groups = stereoGroups, onDismiss = { stereoOpen = false })
     }
 
     phoneTimingFor?.let { phoneId ->

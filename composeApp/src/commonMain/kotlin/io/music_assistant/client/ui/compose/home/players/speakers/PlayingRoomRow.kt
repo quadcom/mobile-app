@@ -54,6 +54,7 @@ import musicassistantclient.composeapp.generated.resources.speakers_pause_room
 import musicassistantclient.composeapp.generated.resources.speakers_paused
 import musicassistantclient.composeapp.generated.resources.speakers_play_room
 import musicassistantclient.composeapp.generated.resources.speakers_playing
+import musicassistantclient.composeapp.generated.resources.speakers_stereo_pair
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.DurationUnit
@@ -75,6 +76,7 @@ internal fun PlayingRoomRow(
     onPlayPause: () -> Unit,
     modifier: Modifier = Modifier,
     groupColour: GroupColour? = null,
+    stereo: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
     val media = item.player.currentMedia
@@ -141,12 +143,22 @@ internal fun PlayingRoomRow(
                 .fillMaxWidth()
                 .padding(start = 16.dp, end = 88.dp, top = 10.dp, bottom = 12.dp),
         ) {
-            Text(
-                text = groupColour?.word() ?: item.player.name,
-                fontSize = 16.sp,
-                lineHeight = 22.sp,
-                fontWeight = FontWeight.Medium,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = groupColour?.word() ?: item.player.name,
+                    fontSize = 16.sp,
+                    lineHeight = 22.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+                if (stereo) {
+                    Text(
+                        text = stringResource(Res.string.speakers_stereo_pair),
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        color = colors.onSurfaceVariant.copy(alpha = 0.8f),
+                    )
+                }
+            }
             if (media != null) {
                 Text(
                     text = listOfNotNull(media.title, media.artist?.takeIf { it.isNotBlank() })

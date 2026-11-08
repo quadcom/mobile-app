@@ -3,6 +3,9 @@ package io.music_assistant.client.ui.compose.home.players.speakers
 import io.music_assistant.client.data.model.client.PlayerData
 import io.music_assistant.client.data.model.client.PlayerData.ChildBind
 import io.music_assistant.client.data.model.client.PlayerDataFixtures
+import io.music_assistant.client.data.model.server.GrantedScopes
+import io.music_assistant.client.data.model.server.Scope
+import io.music_assistant.client.data.speakers.PermanentGroup
 import io.music_assistant.client.data.speakers.SectionKind
 import io.music_assistant.client.data.speakers.SpeakerList
 import io.music_assistant.client.data.speakers.SpeakerRoom
@@ -242,5 +245,31 @@ class SpeakerListLogicTest {
     @Test
     fun aStockServerWithNoRoomsGivesNoSections() {
         assertEquals(emptyList(), listSections(null, emptyList()) { _, _ -> true })
+    }
+
+    private val canConfigure = GrantedScopes(setOf(Scope.CONFIG_PLAYERS_WRITE))
+
+    private fun listWith(vararg groups: PermanentGroup) =
+        SpeakerList(0, emptyList(), emptyMap(), emptyList(), groups.toList())
+
+    @Test
+    fun onlyTwoSpeakerGroupsCanBecomeAStereoPair() {
+        val two = PermanentGroup("p", "Bedroom", listOf("a", "b"))
+        val three = PermanentGroup("q", "Lounge", listOf("a", "b", "c"))
+        assertEquals(listOf(two), stereoPairCandidates(listWith(two, three), canConfigure))
+    }
+
+    @Test
+    fun withoutTheConfigureScopeOrAListThereAreNoCandidates() {
+        val two = PermanentGroup("p", "Bedroom", listOf("a", "b"))
+        assertTrue(stereoPairCandidates(listWith(two), GrantedScopes.NONE).isEmpty())
+        assertTrue(stereoPairCandidates(null, canConfigure).isEmpty())
+    }
+
+    @Test
+    fun yesSavesTheDingedSpeakerAsLeftAndNoSavesTheOther() {
+        val members = listOf("a", "b")
+        assertEquals("a", leftSpeakerFor(members, dinged = "a", isLeft = true))
+        assertEquals("b", leftSpeakerFor(members, dinged = "a", isLeft = false))
     }
 }

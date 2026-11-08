@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -45,7 +46,10 @@ import androidx.compose.ui.unit.sp
 import io.music_assistant.client.data.model.client.PlayerData
 import io.music_assistant.client.data.speakers.GroupColour
 import io.music_assistant.client.ui.compose.home.players.iconRes
+import musicassistantclient.composeapp.generated.resources.Res
+import musicassistantclient.composeapp.generated.resources.speakers_stereo_pair
 import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
 
 /** Primary at 20% over surfaceContainerLow, flattened so the fill is solid. */
 internal val ActiveFill = Color(0xFF183C4A)
@@ -60,7 +64,8 @@ internal const val BACKGROUND_ICON_ALPHA = 0.08f
 /**
  * A 78dp square room card. [highlighted] is the group editor's "in this group" look (fill, border
  * and check fade in place); [dimmed] is a room bound into a group elsewhere. [tag] sits on the top
- * edge; null hides it. [groupColour] draws a 3dp line in that colour along the top edge. A null [onClick] makes the card inert.
+ * edge; null hides it. [groupColour] draws a 3dp line in that colour along the top edge. A null [onClick] makes
+ * the card inert. [stereo] adds a small "Stereo" line under the name.
  */
 @Composable
 internal fun RoomCard(
@@ -71,6 +76,7 @@ internal fun RoomCard(
     tag: String? = null,
     tagAlpha: Float = 0.4f,
     groupColour: GroupColour? = null,
+    stereo: Boolean = false,
     onClick: (() -> Unit)? = null,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -145,6 +151,14 @@ internal fun RoomCard(
                     // One line per word: a word that would wrap overflows instead, so the size steps down.
                     maxLines = shownName.count { it == '\n' } + 1,
                     autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = 14.sp, stepSize = 0.5.sp),
+                )
+            }
+            if (stereo) {
+                Text(
+                    text = stringResource(Res.string.speakers_stereo_pair),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.onSurface.copy(alpha = 0.5f),
+                    maxLines = 1,
                 )
             }
         }

@@ -20,6 +20,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.longOrNull
 
 /** The colour that marks a group of speakers; the server names it, the app only paints it. */
@@ -66,10 +67,21 @@ data class SpeakerRoom(
     val groupLeader: String?,
     /** The rooms the group editor offers for this room as a leader. */
     val groupWith: List<String>,
+    /** Set when the room is a two-speaker group marked left and right. */
+    val isStereoPair: Boolean = false,
 )
 
 /** A group made on the fly; members are in name order. */
 data class SpeakerGroup(val leader: String, val colour: GroupColour?, val members: List<String>)
+
+/** A group that stays; a stereo pair is one with a left speaker chosen. */
+data class PermanentGroup(
+    val player: String,
+    val name: String,
+    val members: List<String>,
+    val isStereoPair: Boolean = false,
+    val stereoLeft: String? = null,
+)
 
 /** The finished speaker list from `hass/speaker_list`. */
 data class SpeakerList(
@@ -77,6 +89,7 @@ data class SpeakerList(
     val sections: List<SpeakerSection>,
     val rooms: Map<String, SpeakerRoom>,
     val groups: List<SpeakerGroup>,
+    val permanentGroups: List<PermanentGroup> = emptyList(),
 ) {
     /** Room id to its group leader's id, for every room the server marks as a member. */
     val bound: Map<String, String> = rooms.mapNotNull { (id, room) -> room.groupLeader?.let { id to it } }.toMap()
@@ -95,6 +108,7 @@ private data class SpeakerListReply(
     val sections: List<SectionDto> = emptyList(),
     val rooms: Map<String, RoomDto> = emptyMap(),
     val groups: List<GroupDto> = emptyList(),
+    @SerialName("permanent_groups") val permanentGroups: List<PermanentGroupDto> = emptyList(),
 )
 
 @Serializable
@@ -110,6 +124,16 @@ private data class RoomDto(
     val available: Boolean = true,
     @SerialName("group_leader") val groupLeader: String? = null,
     @SerialName("group_with") val groupWith: List<String> = emptyList(),
+    @SerialName("is_stereo_pair") val isStereoPair: Boolean = false,
+)
+
+@Serializable
+private data class PermanentGroupDto(
+    val player: String = "",
+    val name: String = "",
+    val members: List<String> = emptyList(),
+    @SerialName("is_stereo_pair") val isStereoPair: Boolean = false,
+    @SerialName("stereo_left") val stereoLeft: String? = null,
 )
 
 @Serializable
@@ -125,8 +149,13 @@ internal fun decodeSpeakerList(json: String): SpeakerList {
     return SpeakerList(
         revision = reply.revision,
         sections = reply.sections.map { SpeakerSection(it.key, SectionKind.fromWire(it.kind), it.title, it.rooms) },
-        rooms = reply.rooms.mapValues { (_, r) -> SpeakerRoom(r.available, r.groupLeader, r.groupWith) },
+        rooms = reply.rooms.mapValues { (_, r) ->
+            SpeakerRoom(r.available, r.groupLeader, r.groupWith, r.isStereoPair)
+        },
         groups = reply.groups.map { SpeakerGroup(it.leader, GroupColour.fromWire(it.colour), it.members) },
+        permanentGroups = reply.permanentGroups.map {
+            PermanentGroup(it.player, it.name, it.members, it.isStereoPair, it.stereoLeft)
+        },
     )
 }
 
@@ -190,6 +219,34 @@ class SpeakerListSource(
                 log.w { "Could not read the speaker list: ${e::class.simpleName}" }
             }
         }
+    }
+
+    /** Plays a short ding on that one speaker. Safe to repeat. */
+    suspend fun identifyStereoSpeaker(playerId: String): Result<Unit> =
+        call(Request.Player.stereoPairIdentify(playerId))
+
+    /** Saves the pair with [leftPlayerId] on the left, or turns the pair off when it is null. */
+    suspend fun setStereoPair(groupId: String, leftPlayerId: String?): Result<Unit> =
+        call(Request.Player.stereoPairSet(groupId, leftPlayerId))
+
+    // The server reports a refusal as an answer with an error_code, not as a failed send. Only its own
+    // "details" text is passed on; any other failure keeps only its cause, with no message, so the dialog
+    // shows its own words rather than a raw technical one.
+    private suspend fun call(request: Request): Result<Unit> = try {
+        val answer = withTimeout(TIMEOUT_MS) { apiClient.sendRequest(request) }.getOrThrow()
+        if (answer.json.containsKey("error_code")) {
+            val details = (answer.json["details"] as? JsonPrimitive)?.contentOrNull
+            Result.failure(IllegalStateException(details))
+        } else {
+            Result.success(Unit)
+        }
+    } catch (e: CancellationException) {
+        // A timeout is a failed call; any other cancellation must reach the scope.
+        if (e !is TimeoutCancellationException) throw e
+        Result.failure(IllegalStateException(null, e))
+    } catch (e: Exception) {
+        log.w { "Stereo pair call failed: ${e::class.simpleName}" }
+        Result.failure(IllegalStateException(null, e))
     }
 
     private companion object {
