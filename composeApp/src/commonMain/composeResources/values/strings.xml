@@ -369,6 +369,11 @@
   <string name="stereo_pair_no_right">No, that's the right</string>
   <string name="stereo_pair_play_again">Play again</string>
   <string name="stereo_pair_pick">Which speakers?</string>
+  <string name="stereo_pair_new">New pair…</string>
+  <string name="stereo_pair_first">Pick the first speaker</string>
+  <string name="stereo_pair_second">Pick the speaker to pair with it</string>
+  <string name="stereo_pair_name">Name</string>
+  <string name="stereo_pair_create">Create</string>
   <string name="stereo_pair_failed">The stereo pair could not be set up. Check the connection and try again.</string>
   <string name="speakers_this_room">This room</string>
   <string name="speakers_group_with">Group with %1$s</string>

@@ -1,5 +1,7 @@
 package io.music_assistant.client.data.speakers
 
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.test.Test
@@ -98,6 +100,26 @@ class SpeakerListSourceTest {
     @Test
     fun aServerWithoutStereoPairsSendsNoPermanentGroups() {
         assertTrue(decodeSpeakerList("{}").permanentGroups.isEmpty())
+    }
+
+    @Test
+    fun decodesTheNameAreaAndPermanentGroupFlagOfARoom() {
+        val room = decodeSpeakerList(
+            """{"rooms": {"k": {"name": "Kitchen", "area": "Downstairs", "is_permanent_group": true}, "g": {}}}""",
+        ).rooms
+        assertEquals(SpeakerRoom(true, null, emptyList(), false, "Kitchen", "Downstairs", true), room["k"])
+        assertNull(room["g"]?.name)
+        assertFalse(room["g"]?.isPermanentGroup == true)
+    }
+
+    @Test
+    fun readsTheNewGroupIdFromTheCreateAnswer() {
+        assertEquals("syncgroup_1", decodeCreatedGroupId(buildJsonObject { put("group_id", "syncgroup_1") }))
+        assertNull(decodeCreatedGroupId(buildJsonObject { put("other", "x") }))
+        assertNull(decodeCreatedGroupId(buildJsonObject { put("group_id", "") }))
+        assertNull(decodeCreatedGroupId(JsonPrimitive("syncgroup_1")))
+        assertNull(decodeCreatedGroupId(JsonNull))
+        assertNull(decodeCreatedGroupId(null))
     }
 
     private fun event(revision: Any?) = buildJsonObject {

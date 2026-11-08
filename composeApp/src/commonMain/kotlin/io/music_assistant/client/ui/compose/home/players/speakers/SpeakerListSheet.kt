@@ -100,7 +100,10 @@ fun SpeakerListSheet(
     }
     LaunchedEffect(order) { if (order != topOrder) onTopOrderChange(order) }
 
-    val stereoGroups = stereoPairCandidates(list, LocalGrantedScopes.current)
+    val grantedScopes = LocalGrantedScopes.current
+    val stereoGroups = stereoPairCandidates(list, grantedScopes)
+    // "New pair…" needs no existing group, only a server list to pick from and the right to configure players.
+    val canSetUpPair = list != null && grantedScopes.canConfigurePlayers
     var stereoOpen by remember { mutableStateOf(false) }
     var editorFor by remember { mutableStateOf<String?>(null) }
     var phoneTimingFor by remember { mutableStateOf<String?>(null) }
@@ -163,15 +166,15 @@ fun SpeakerListSheet(
                             trailingIcon = Icons.Default.Check.takeIf { hideUnavailable },
                             onClick = onToggleHideUnavailable,
                         ),
-                    ) + if (stereoGroups.isEmpty()) {
-                        emptyList()
-                    } else {
+                    ) + if (canSetUpPair) {
                         listOf(
                             OverflowMenuOption(
                                 title = stringResource(Res.string.stereo_pair_setup),
                                 onClick = { stereoOpen = true },
                             ),
                         )
+                    } else {
+                        emptyList()
                     },
                 ) { onClick ->
                     IconButton(onClick = onClick) {
@@ -301,7 +304,14 @@ fun SpeakerListSheet(
     }
 
     if (stereoOpen) {
-        StereoPairDialog(groups = stereoGroups, onDismiss = { stereoOpen = false })
+        list?.let {
+            StereoPairDialog(
+                groups = stereoGroups,
+                list = it,
+                ownPlayerId = players.firstOrNull { p -> p.isLocal }?.playerId,
+                onDismiss = { stereoOpen = false },
+            )
+        }
     }
 
     phoneTimingFor?.let { phoneId ->

@@ -272,4 +272,34 @@ class SpeakerListLogicTest {
         assertEquals("a", leftSpeakerFor(members, dinged = "a", isLeft = true))
         assertEquals("b", leftSpeakerFor(members, dinged = "a", isLeft = false))
     }
+
+    private fun pairList(vararg rooms: Pair<String, SpeakerRoom>) =
+        SpeakerList(0, emptyList(), rooms.toMap(), emptyList())
+
+    private val pairRooms = pairList(
+        "k" to SpeakerRoom(true, null, listOf("l", "m", "n", "own"), name = "Kitchen", area = "Downstairs"),
+        "l" to SpeakerRoom(true, null, listOf("k"), name = "Lounge"),
+        "m" to SpeakerRoom(false, null, listOf("k"), name = "Study"),
+        "n" to SpeakerRoom(true, null, listOf("k"), name = "Den", isPermanentGroup = true),
+        "own" to SpeakerRoom(true, null, listOf("k"), name = "Phone"),
+        "alone" to SpeakerRoom(true, null, emptyList(), name = "Alone"),
+    )
+
+    @Test
+    fun firstSpeakerIsAnAvailableSingleRoomThatCanGroupAndIsNotThePhone() {
+        assertEquals(listOf("k", "l"), firstPairSpeakers(pairRooms, ownPlayerId = "own"))
+    }
+
+    @Test
+    fun secondSpeakerComesFromTheFirstsGroupWithListByTheSameRule() {
+        assertEquals(listOf("l"), secondPairSpeakers(pairRooms, "k", ownPlayerId = "own"))
+        assertTrue(secondPairSpeakers(pairRooms, "missing", ownPlayerId = null).isEmpty())
+    }
+
+    @Test
+    fun pairNameDefaultsToTheFirstSpeakersAreaThenItsName() {
+        assertEquals("Downstairs", defaultPairName(pairRooms, "k"))
+        assertEquals("Lounge", defaultPairName(pairRooms, "l"))
+        assertEquals("zzz", defaultPairName(pairRooms, "zzz"))
+    }
 }

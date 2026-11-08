@@ -74,6 +74,15 @@ data class Request @OptIn(ExperimentalUuidApi::class) constructor(
             },
         )
 
+        // No left id: the sides are chosen afterwards by the ding-and-ask step.
+        fun stereoPairCreate(name: String, playerIds: List<String>) = Request(
+            command = APICommands.STEREO_PAIR_CREATE,
+            args = buildJsonObject {
+                put("name", JsonPrimitive(name))
+                put("player_ids", JsonArray(playerIds.map { JsonPrimitive(it) }))
+            },
+        )
+
         fun simpleCommand(
             playerId: String,
             command: String,

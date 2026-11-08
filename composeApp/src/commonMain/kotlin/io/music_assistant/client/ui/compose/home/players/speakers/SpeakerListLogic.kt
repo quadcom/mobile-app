@@ -167,6 +167,31 @@ internal fun floorGroupAction(
 internal fun stereoPairCandidates(list: SpeakerList?, scopes: GrantedScopes): List<PermanentGroup> =
     if (scopes.canConfigurePlayers) list?.permanentGroups.orEmpty().filter { it.members.size == 2 } else emptyList()
 
+// A room can join a new pair when it is up and is a single speaker; the phone's own player is never offered.
+private fun SpeakerList.canJoinPair(id: String, ownPlayerId: String?): Boolean =
+    rooms[id]?.let { it.available && !it.isPermanentGroup } == true && id != ownPlayerId
+
+/** What the pair pick list shows for a room: the server's name, else the id. */
+internal fun pairSpeakerName(list: SpeakerList, id: String): String =
+    list.rooms[id]?.name?.takeIf { it.isNotBlank() } ?: id
+
+/** The rooms that can be the first speaker of a new pair: those that can group with at least one other room. */
+internal fun firstPairSpeakers(list: SpeakerList, ownPlayerId: String?): List<String> =
+    list.rooms.keys
+        .filter { list.canJoinPair(it, ownPlayerId) && list.rooms[it]?.groupWith?.isNotEmpty() == true }
+        .sortedBy { pairSpeakerName(list, it).lowercase() }
+
+/** The rooms that can be paired with [first]: the ones the server says it can group with, by the same rule. */
+internal fun secondPairSpeakers(list: SpeakerList, first: String, ownPlayerId: String?): List<String> =
+    list.rooms[first]?.groupWith.orEmpty()
+        .filter { it != first && list.canJoinPair(it, ownPlayerId) }
+        .distinct()
+        .sortedBy { pairSpeakerName(list, it).lowercase() }
+
+/** The name offered for a new pair: the first speaker's area, else the first speaker's own name. */
+internal fun defaultPairName(list: SpeakerList, first: String): String =
+    list.rooms[first]?.area?.takeIf { it.isNotBlank() } ?: pairSpeakerName(list, first)
+
 /**
  * The speaker that gets saved as the left one. "Yes" says the speaker that just dinged is the left one;
  * "No, that's the right" says the other member is.

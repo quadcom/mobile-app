@@ -1,6 +1,7 @@
 package io.music_assistant.client.data.speakers
 
 import co.touchlab.kermit.Logger
+import io.music_assistant.client.api.Answer
 import io.music_assistant.client.api.Request
 import io.music_assistant.client.api.ServiceClient
 import io.music_assistant.client.data.model.server.events.ProviderEvent
@@ -18,6 +19,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -69,6 +71,12 @@ data class SpeakerRoom(
     val groupWith: List<String>,
     /** Set when the room is a two-speaker group marked left and right. */
     val isStereoPair: Boolean = false,
+    /** The server's name for the room; null from a server that does not send it. */
+    val name: String? = null,
+    /** The Home Assistant area the room sits in, if any. */
+    val area: String? = null,
+    /** Set when the room is a permanent group, which cannot be a member of a new pair. */
+    val isPermanentGroup: Boolean = false,
 )
 
 /** A group made on the fly; members are in name order. */
@@ -125,6 +133,9 @@ private data class RoomDto(
     @SerialName("group_leader") val groupLeader: String? = null,
     @SerialName("group_with") val groupWith: List<String> = emptyList(),
     @SerialName("is_stereo_pair") val isStereoPair: Boolean = false,
+    val name: String? = null,
+    val area: String? = null,
+    @SerialName("is_permanent_group") val isPermanentGroup: Boolean = false,
 )
 
 @Serializable
@@ -150,7 +161,7 @@ internal fun decodeSpeakerList(json: String): SpeakerList {
         revision = reply.revision,
         sections = reply.sections.map { SpeakerSection(it.key, SectionKind.fromWire(it.kind), it.title, it.rooms) },
         rooms = reply.rooms.mapValues { (_, r) ->
-            SpeakerRoom(r.available, r.groupLeader, r.groupWith, r.isStereoPair)
+            SpeakerRoom(r.available, r.groupLeader, r.groupWith, r.isStereoPair, r.name, r.area, r.isPermanentGroup)
         },
         groups = reply.groups.map { SpeakerGroup(it.leader, GroupColour.fromWire(it.colour), it.members) },
         permanentGroups = reply.permanentGroups.map {
@@ -158,6 +169,10 @@ internal fun decodeSpeakerList(json: String): SpeakerList {
         },
     )
 }
+
+/** The new group's id from the `hass/stereo_pair/create` result, an object `{"group_id": "..."}`; null if absent. */
+internal fun decodeCreatedGroupId(result: JsonElement?): String? =
+    ((result as? JsonObject)?.get("group_id") as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
 
 /**
  * Whether a `speaker_list` event is worth a re-read: its revision differs from the held one (a restarted
@@ -229,16 +244,25 @@ class SpeakerListSource(
     suspend fun setStereoPair(groupId: String, leftPlayerId: String?): Result<Unit> =
         call(Request.Player.stereoPairSet(groupId, leftPlayerId))
 
+    /** Makes a permanent group of the two speakers, with no sides yet, and returns its group id. */
+    suspend fun createStereoPair(name: String, playerIds: List<String>): Result<String> =
+        call(Request.Player.stereoPairCreate(name, playerIds)) { decodeCreatedGroupId(it.result) }
+            // A success without an id cannot go on to the ding step. The blank message makes the dialog show
+            // its own words.
+            .mapCatching { it ?: error("") }
+
+    private suspend fun call(request: Request): Result<Unit> = call(request) { }
+
     // The server reports a refusal as an answer with an error_code, not as a failed send. Only its own
     // "details" text is passed on; any other failure keeps only its cause, with no message, so the dialog
     // shows its own words rather than a raw technical one.
-    private suspend fun call(request: Request): Result<Unit> = try {
+    private suspend fun <T> call(request: Request, read: (Answer) -> T): Result<T> = try {
         val answer = withTimeout(TIMEOUT_MS) { apiClient.sendRequest(request) }.getOrThrow()
         if (answer.json.containsKey("error_code")) {
             val details = (answer.json["details"] as? JsonPrimitive)?.contentOrNull
             Result.failure(IllegalStateException(details))
         } else {
-            Result.success(Unit)
+            Result.success(read(answer))
         }
     } catch (e: CancellationException) {
         // A timeout is a failed call; any other cancellation must reach the scope.

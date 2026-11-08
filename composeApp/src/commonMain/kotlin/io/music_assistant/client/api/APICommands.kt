@@ -7,6 +7,7 @@ object APICommands {
     const val SPEAKER_LIST_SET_MEMBERS = "hass/speaker_list/set_members"
     const val STEREO_PAIR_IDENTIFY = "hass/stereo_pair/identify"
     const val STEREO_PAIR_SET = "hass/stereo_pair/set"
+    const val STEREO_PAIR_CREATE = "hass/stereo_pair/create"
     const val PLAYERS_CMD = "players/cmd"
     const val PLAYERS_CMD_SEEK = "$PLAYERS_CMD/seek"
     const val PLAYERS_CMD_POWER = "$PLAYERS_CMD/power"
