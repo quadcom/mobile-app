@@ -2,6 +2,7 @@ package io.music_assistant.client.ui.compose.home.players
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.music_assistant.client.data.model.client.PlayerData
@@ -10,12 +11,17 @@ import io.music_assistant.client.data.model.client.items.AppMediaItem
 import io.music_assistant.client.data.model.client.items.PodcastEpisode
 import io.music_assistant.client.data.model.client.items.Track
 import io.music_assistant.client.data.repository.QueueOverlayRepository
+import io.music_assistant.client.data.speakers.SpeakerListSource
+import io.music_assistant.client.ui.compose.common.LocalGrantedScopes
 import io.music_assistant.client.ui.compose.common.action.PlayerAction
 import io.music_assistant.client.ui.compose.common.items.AddToPlaylistDialog
 import io.music_assistant.client.ui.compose.common.items.ChooseArtistDialog
 import io.music_assistant.client.ui.compose.common.items.PlaylistActions
 import io.music_assistant.client.ui.compose.home.HomeScreenViewModel
 import io.music_assistant.client.ui.compose.home.players.announcement.AnnouncementDialog
+import io.music_assistant.client.ui.compose.home.players.speakers.RoomPickerDialog
+import io.music_assistant.client.ui.compose.home.players.speakers.StereoPairDialog
+import io.music_assistant.client.ui.compose.home.players.speakers.stereoPairCandidates
 import io.music_assistant.client.ui.compose.provider.ProviderViewModel
 import org.koin.compose.koinInject
 
@@ -52,6 +58,19 @@ fun PlayerDialogHost(
             dspSettingsViewModel = dspSettingsViewModel,
             onDismissRequest = onDismiss,
         )
+
+        is PlayerDialogRequest.Room -> RoomPickerDialog(
+            playerId = request.playerId,
+            onDismiss = onDismiss,
+        )
+
+        is PlayerDialogRequest.Stereo -> {
+            val list by koinInject<SpeakerListSource>().list.collectAsStateWithLifecycle()
+            val group = stereoPairCandidates(list, LocalGrantedScopes.current)
+                .firstOrNull { it.player == request.playerId }
+                ?: return DismissEffect(request, onDismiss)
+            StereoPairDialog(group = group, onDismiss = onDismiss)
+        }
 
         is PlayerDialogRequest.SleepTimer -> SleepTimerDialog(
             expiresAtSec = player.player.sleepTimerExpiresAt,

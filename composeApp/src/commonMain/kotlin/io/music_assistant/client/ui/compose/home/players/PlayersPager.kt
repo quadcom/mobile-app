@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.MeetingRoom
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -98,6 +99,7 @@ import io.music_assistant.client.data.model.client.items.PodcastEpisode
 import io.music_assistant.client.data.model.client.items.Track
 import io.music_assistant.client.data.play.PlayMode
 import io.music_assistant.client.data.repository.QueueOverlayRepository
+import io.music_assistant.client.data.speakers.SpeakerListSource
 import io.music_assistant.client.ui.alphaOn
 import io.music_assistant.client.ui.compose.common.CenteredThreeSlotRow
 import io.music_assistant.client.ui.compose.common.DataState
@@ -125,6 +127,7 @@ import io.music_assistant.client.ui.compose.home.CollapsibleQueue
 import io.music_assistant.client.ui.compose.home.HomeScreenViewModel
 import io.music_assistant.client.ui.compose.home.HorizontalPagerIndicator
 import io.music_assistant.client.ui.compose.home.Queue
+import io.music_assistant.client.ui.compose.home.players.speakers.stereoPairCandidates
 import io.music_assistant.client.ui.compose.provider.ProviderViewModel
 import io.music_assistant.client.ui.inactive
 import io.music_assistant.client.ui.utils.WindowClass
@@ -154,6 +157,8 @@ import musicassistantclient.composeapp.generated.resources.players_show_group_vo
 import musicassistantclient.composeapp.generated.resources.queue_clear
 import musicassistantclient.composeapp.generated.resources.queue_no_other_players
 import musicassistantclient.composeapp.generated.resources.queue_transfer
+import musicassistantclient.composeapp.generated.resources.room_picker_title
+import musicassistantclient.composeapp.generated.resources.stereo_pair_setup
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
@@ -210,6 +215,8 @@ fun PlayersPager(
             .collectAsStateWithLifecycle()
         // Write actions the user's role cannot run stay hidden.
         val grantedScopes = LocalGrantedScopes.current
+        // Null on a stock server; the room and stereo entries only exist on Adrian's.
+        val speakerList by koinInject<SpeakerListSource>().list.collectAsStateWithLifecycle()
 
         val playerAction1 =
             { data: PlayerData, action: PlayerAction ->
@@ -297,6 +304,16 @@ fun PlayersPager(
                 val onDspButton: () -> Unit = remember(playerId) {
                     {
                         dialogRequest = PlayerDialogRequest.Dsp(playerId)
+                    }
+                }
+                val onRoomButton: () -> Unit = remember(playerId) {
+                    {
+                        dialogRequest = PlayerDialogRequest.Room(playerId)
+                    }
+                }
+                val onStereoButton: () -> Unit = remember(playerId) {
+                    {
+                        dialogRequest = PlayerDialogRequest.Stereo(playerId)
                     }
                 }
                 val onSleepTimerButton: () -> Unit = remember(playerId) {
@@ -408,6 +425,12 @@ fun PlayersPager(
                                 onSelectPlayer = onSelectPlayer,
                                 onDspButton = onDspButton.takeIf {
                                     !player.player.isGroup && grantedScopes.canConfigurePlayers
+                                },
+                                onRoomButton = onRoomButton.takeIf {
+                                    grantedScopes.canConfigurePlayers && speakerList != null
+                                },
+                                onStereoButton = onStereoButton.takeIf {
+                                    stereoPairCandidates(speakerList, grantedScopes).any { it.player == playerId }
                                 },
                                 onSleepTimerButton = onSleepTimerButton.takeIf { sleepTimerSupported },
                                 // Voice is never offered for the phone's own player, so it alone can't show the entry.
@@ -521,6 +544,8 @@ private fun ExpandedPlayerPage(
     onAnnounceButton: (() -> Unit)?,
     onAmbientSoundButton: (() -> Unit)?,
     playerAction: (PlayerData, PlayerAction) -> Unit,
+    onRoomButton: (() -> Unit)? = null,
+    onStereoButton: (() -> Unit)? = null,
     // Targets one speaker of the group; the group volume pop-up drives each member by its id.
     playerActionById: (String, PlayerAction) -> Unit = { _, _ -> },
     onAddToPlaylist: ((AppMediaItem) -> Unit)? = null,
@@ -608,6 +633,8 @@ private fun ExpandedPlayerPage(
                     navigateToItem = navigateAndClose,
                     onPlayerSelected = { moveToPlayer(it) },
                     onOpenDsp = onDspButton,
+                    onOpenRoom = onRoomButton,
+                    onOpenStereo = onStereoButton,
                     onAnnounce = onAnnounceButton,
                     onAmbientSound = onAmbientSoundButton,
                     onAddToPlaylist = onAddToPlaylist,
@@ -998,6 +1025,8 @@ private fun PlayerOverflowMenu(
     onOpenDsp: (() -> Unit)?,
     onAnnounce: (() -> Unit)?,
     onAmbientSound: (() -> Unit)?,
+    onOpenRoom: (() -> Unit)? = null,
+    onOpenStereo: (() -> Unit)? = null,
     onAddToPlaylist: ((AppMediaItem) -> Unit)? = null,
     queueDjMenu: QueueDjMenu? = null,
     onQueueDjSelected: (queueId: String, hostId: String?) -> Unit = { _, _ -> },
@@ -1145,6 +1174,23 @@ private fun PlayerOverflowMenu(
                     },
                     icon = Icons.Default.Waves,
                     onClick = it,
+                ),
+            )
+        }
+        if (onOpenRoom != null) {
+            add(
+                OverflowMenuOption(
+                    title = stringResource(Res.string.room_picker_title),
+                    icon = Icons.Default.MeetingRoom,
+                    onClick = onOpenRoom,
+                ),
+            )
+        }
+        if (onOpenStereo != null) {
+            add(
+                OverflowMenuOption(
+                    title = stringResource(Res.string.stereo_pair_setup),
+                    onClick = onOpenStereo,
                 ),
             )
         }

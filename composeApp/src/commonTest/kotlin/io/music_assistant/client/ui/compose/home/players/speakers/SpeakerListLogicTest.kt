@@ -249,20 +249,28 @@ class SpeakerListLogicTest {
 
     private val canConfigure = GrantedScopes(setOf(Scope.CONFIG_PLAYERS_WRITE))
 
-    private fun listWith(vararg groups: PermanentGroup) =
-        SpeakerList(0, emptyList(), emptyMap(), emptyList(), groups.toList())
+    private val pair = PermanentGroup("p", "Bedroom", listOf("a", "b"))
+    private val plain = PermanentGroup("q", "Lounge", listOf("c", "d"))
+
+    private fun listWith(vararg groups: PermanentGroup) = SpeakerList(
+        0,
+        emptyList(),
+        mapOf(
+            "p" to SpeakerRoom(true, null, emptyList(), groupKind = "stereo_pair"),
+            "q" to SpeakerRoom(true, null, emptyList(), groupKind = "permanent"),
+        ),
+        emptyList(),
+        groups.toList(),
+    )
 
     @Test
-    fun onlyTwoSpeakerGroupsCanBecomeAStereoPair() {
-        val two = PermanentGroup("p", "Bedroom", listOf("a", "b"))
-        val three = PermanentGroup("q", "Lounge", listOf("a", "b", "c"))
-        assertEquals(listOf(two), stereoPairCandidates(listWith(two, three), canConfigure))
+    fun onlyGroupsTheServerMarksAsStereoPairsAreCandidates() {
+        assertEquals(listOf(pair), stereoPairCandidates(listWith(pair, plain), canConfigure))
     }
 
     @Test
     fun withoutTheConfigureScopeOrAListThereAreNoCandidates() {
-        val two = PermanentGroup("p", "Bedroom", listOf("a", "b"))
-        assertTrue(stereoPairCandidates(listWith(two), GrantedScopes.NONE).isEmpty())
+        assertTrue(stereoPairCandidates(listWith(pair), GrantedScopes.NONE).isEmpty())
         assertTrue(stereoPairCandidates(null, canConfigure).isEmpty())
     }
 
@@ -271,35 +279,5 @@ class SpeakerListLogicTest {
         val members = listOf("a", "b")
         assertEquals("a", leftSpeakerFor(members, dinged = "a", isLeft = true))
         assertEquals("b", leftSpeakerFor(members, dinged = "a", isLeft = false))
-    }
-
-    private fun pairList(vararg rooms: Pair<String, SpeakerRoom>) =
-        SpeakerList(0, emptyList(), rooms.toMap(), emptyList())
-
-    private val pairRooms = pairList(
-        "k" to SpeakerRoom(true, null, listOf("l", "m", "n", "own"), name = "Kitchen", area = "Downstairs"),
-        "l" to SpeakerRoom(true, null, listOf("k"), name = "Lounge"),
-        "m" to SpeakerRoom(false, null, listOf("k"), name = "Study"),
-        "n" to SpeakerRoom(true, null, listOf("k"), name = "Den", isPermanentGroup = true),
-        "own" to SpeakerRoom(true, null, listOf("k"), name = "Phone"),
-        "alone" to SpeakerRoom(true, null, emptyList(), name = "Alone"),
-    )
-
-    @Test
-    fun firstSpeakerIsAnAvailableSingleRoomThatCanGroupAndIsNotThePhone() {
-        assertEquals(listOf("k", "l"), firstPairSpeakers(pairRooms, ownPlayerId = "own"))
-    }
-
-    @Test
-    fun secondSpeakerComesFromTheFirstsGroupWithListByTheSameRule() {
-        assertEquals(listOf("l"), secondPairSpeakers(pairRooms, "k", ownPlayerId = "own"))
-        assertTrue(secondPairSpeakers(pairRooms, "missing", ownPlayerId = null).isEmpty())
-    }
-
-    @Test
-    fun pairNameDefaultsToTheFirstSpeakersAreaThenItsName() {
-        assertEquals("Downstairs", defaultPairName(pairRooms, "k"))
-        assertEquals("Lounge", defaultPairName(pairRooms, "l"))
-        assertEquals("zzz", defaultPairName(pairRooms, "zzz"))
     }
 }

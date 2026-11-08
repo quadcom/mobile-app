@@ -23,6 +23,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.longOrNull
 
 /** The colour that marks a group of speakers; the server names it, the app only paints it. */
@@ -75,8 +76,10 @@ data class SpeakerRoom(
     val name: String? = null,
     /** The Home Assistant area the room sits in, if any. */
     val area: String? = null,
-    /** Set when the room is a permanent group, which cannot be a member of a new pair. */
+    /** Set when the room is a permanent group or a stereo pair. */
     val isPermanentGroup: Boolean = false,
+    /** "permanent", "stereo_pair" or "dynamic"; null from a server that does not say. */
+    val groupKind: String? = null,
 )
 
 /** A group made on the fly; members are in name order. */
@@ -136,6 +139,7 @@ private data class RoomDto(
     val name: String? = null,
     val area: String? = null,
     @SerialName("is_permanent_group") val isPermanentGroup: Boolean = false,
+    @SerialName("group_kind") val groupKind: String? = null,
 )
 
 @Serializable
@@ -161,7 +165,16 @@ internal fun decodeSpeakerList(json: String): SpeakerList {
         revision = reply.revision,
         sections = reply.sections.map { SpeakerSection(it.key, SectionKind.fromWire(it.kind), it.title, it.rooms) },
         rooms = reply.rooms.mapValues { (_, r) ->
-            SpeakerRoom(r.available, r.groupLeader, r.groupWith, r.isStereoPair, r.name, r.area, r.isPermanentGroup)
+            SpeakerRoom(
+                available = r.available,
+                groupLeader = r.groupLeader,
+                groupWith = r.groupWith,
+                isStereoPair = r.isStereoPair,
+                name = r.name,
+                area = r.area,
+                isPermanentGroup = r.isPermanentGroup,
+                groupKind = r.groupKind,
+            )
         },
         groups = reply.groups.map { SpeakerGroup(it.leader, GroupColour.fromWire(it.colour), it.members) },
         permanentGroups = reply.permanentGroups.map {
@@ -170,9 +183,45 @@ internal fun decodeSpeakerList(json: String): SpeakerList {
     )
 }
 
-/** The new group's id from the `hass/stereo_pair/create` result, an object `{"group_id": "..."}`; null if absent. */
-internal fun decodeCreatedGroupId(result: JsonElement?): String? =
-    ((result as? JsonObject)?.get("group_id") as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+/** A Home Assistant floor; the server already sends floors in Home Assistant's order, so [level] is only shown. */
+data class HaFloor(val floorId: String, val name: String, val level: Int? = null)
+
+data class HaArea(val areaId: String, val name: String, val floorId: String? = null)
+
+/** The `hass/areas` reply; [playerAreas] maps a player id to its area id, or null for none. */
+data class HaAreas(val floors: List<HaFloor>, val areas: List<HaArea>, val playerAreas: Map<String, String?>)
+
+@Serializable
+private data class FloorDto(@SerialName("floor_id") val floorId: String, val name: String = "", val level: Int? = null)
+
+@Serializable
+private data class AreaDto(
+    @SerialName("area_id") val areaId: String,
+    val name: String = "",
+    @SerialName("floor_id") val floorId: String? = null,
+)
+
+@Serializable
+private data class AreasDto(
+    val floors: List<FloorDto> = emptyList(),
+    val areas: List<AreaDto> = emptyList(),
+    @SerialName("player_areas") val playerAreas: Map<String, String?> = emptyMap(),
+)
+
+/** Decodes the `hass/areas` result; null when it is absent or not in that shape. */
+internal fun decodeAreas(result: JsonElement?): HaAreas? {
+    if (result == null) return null
+    val dto = runCatching { myJson.decodeFromJsonElement<AreasDto>(result) }.getOrNull() ?: return null
+    return HaAreas(
+        floors = dto.floors.map { HaFloor(it.floorId, it.name, it.level) },
+        areas = dto.areas.map { HaArea(it.areaId, it.name, it.floorId) },
+        playerAreas = dto.playerAreas,
+    )
+}
+
+/** The new room's id from the `hass/areas/create` result, an object `{"area_id": "..."}`; null if absent. */
+internal fun decodeCreatedAreaId(result: JsonElement?): String? =
+    ((result as? JsonObject)?.get("area_id") as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
 
 /**
  * Whether a `speaker_list` event is worth a re-read: its revision differs from the held one (a restarted
@@ -244,11 +293,18 @@ class SpeakerListSource(
     suspend fun setStereoPair(groupId: String, leftPlayerId: String?): Result<Unit> =
         call(Request.Player.stereoPairSet(groupId, leftPlayerId))
 
-    /** Makes a permanent group of the two speakers, with no sides yet, and returns its group id. */
-    suspend fun createStereoPair(name: String, playerIds: List<String>): Result<String> =
-        call(Request.Player.stereoPairCreate(name, playerIds)) { decodeCreatedGroupId(it.result) }
-            // A success without an id cannot go on to the ding step. The blank message makes the dialog show
-            // its own words.
+    /** The rooms and floors, and which room each player is in. */
+    suspend fun areas(): Result<HaAreas> =
+        call(Request.Player.hassAreas()) { decodeAreas(it.result) }
+            // The blank message makes the dialog show its own words.
+            .mapCatching { it ?: error("") }
+
+    suspend fun setPlayerArea(playerId: String, areaId: String?): Result<Unit> =
+        call(Request.Player.hassAreasSetPlayer(playerId, areaId))
+
+    /** Makes a room, on an existing floor or a new one, and returns its area id. */
+    suspend fun createArea(name: String, floorId: String?, newFloorName: String?): Result<String> =
+        call(Request.Player.hassAreasCreate(name, floorId, newFloorName)) { decodeCreatedAreaId(it.result) }
             .mapCatching { it ?: error("") }
 
     private suspend fun call(request: Request): Result<Unit> = call(request) { }

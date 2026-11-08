@@ -74,12 +74,24 @@ data class Request @OptIn(ExperimentalUuidApi::class) constructor(
             },
         )
 
-        // No left id: the sides are chosen afterwards by the ding-and-ask step.
-        fun stereoPairCreate(name: String, playerIds: List<String>) = Request(
-            command = APICommands.STEREO_PAIR_CREATE,
+        fun hassAreas() = Request(command = APICommands.HASS_AREAS)
+
+        // A null area id takes the player out of its room, so it is sent as JSON null rather than left out.
+        fun hassAreasSetPlayer(playerId: String, areaId: String?) = Request(
+            command = APICommands.HASS_AREAS_SET_PLAYER,
+            args = buildJsonObject {
+                put("player_id", JsonPrimitive(playerId))
+                put("area_id", JsonPrimitive(areaId))
+            },
+        )
+
+        // The server refuses both a floor id and a new floor name, so absent ones are left out.
+        fun hassAreasCreate(name: String, floorId: String?, newFloorName: String?) = Request(
+            command = APICommands.HASS_AREAS_CREATE,
             args = buildJsonObject {
                 put("name", JsonPrimitive(name))
-                put("player_ids", JsonArray(playerIds.map { JsonPrimitive(it) }))
+                floorId?.let { put("floor_id", JsonPrimitive(it)) }
+                newFloorName?.let { put("new_floor_name", JsonPrimitive(it)) }
             },
         )
 

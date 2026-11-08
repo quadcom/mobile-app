@@ -1,5 +1,6 @@
 package io.music_assistant.client.data.speakers
 
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -113,13 +114,63 @@ class SpeakerListSourceTest {
     }
 
     @Test
-    fun readsTheNewGroupIdFromTheCreateAnswer() {
-        assertEquals("syncgroup_1", decodeCreatedGroupId(buildJsonObject { put("group_id", "syncgroup_1") }))
-        assertNull(decodeCreatedGroupId(buildJsonObject { put("other", "x") }))
-        assertNull(decodeCreatedGroupId(buildJsonObject { put("group_id", "") }))
-        assertNull(decodeCreatedGroupId(JsonPrimitive("syncgroup_1")))
-        assertNull(decodeCreatedGroupId(JsonNull))
-        assertNull(decodeCreatedGroupId(null))
+    fun readsTheNewAreaIdFromTheCreateAnswer() {
+        assertEquals("kitchen", decodeCreatedAreaId(buildJsonObject { put("area_id", "kitchen") }))
+        assertNull(decodeCreatedAreaId(buildJsonObject { put("other", "x") }))
+        assertNull(decodeCreatedAreaId(buildJsonObject { put("area_id", "") }))
+        assertNull(decodeCreatedAreaId(JsonPrimitive("kitchen")))
+        assertNull(decodeCreatedAreaId(JsonNull))
+        assertNull(decodeCreatedAreaId(null))
+    }
+
+    @Test
+    fun decodesTheGroupKindOfARoom() {
+        val room = decodeSpeakerList("""{"rooms": {"p": {"group_kind": "stereo_pair"}, "q": {}}}""").rooms
+        assertEquals("stereo_pair", room["p"]?.groupKind)
+        assertNull(room["q"]?.groupKind)
+    }
+
+    private fun areasJson(text: String) = Json.parseToJsonElement(text)
+
+    @Test
+    fun decodesFloorsRoomsAndWhereEachPlayerIs() {
+        val areas = decodeAreas(
+            areasJson(
+                """{"floors": [{"floor_id": "up", "name": "Upstairs", "level": 1}],
+                    "areas": [{"area_id": "bed", "name": "Bedroom", "floor_id": "up"}],
+                    "player_areas": {"p1": "bed", "p2": null}}""",
+            ),
+        )
+        assertEquals(listOf(HaFloor("up", "Upstairs", 1)), areas?.floors)
+        assertEquals(listOf(HaArea("bed", "Bedroom", "up")), areas?.areas)
+        assertEquals(mapOf("p1" to "bed", "p2" to null), areas?.playerAreas)
+    }
+
+    @Test
+    fun aRoomOrFloorWithNoFloorOrLevelDecodesWithNulls() {
+        val areas = decodeAreas(
+            areasJson(
+                """{"floors": [{"floor_id": "f", "name": "F"}],
+                    "areas": [{"area_id": "a", "name": "A", "floor_id": null}]}""",
+            ),
+        )
+        assertNull(areas?.floors?.single()?.level)
+        assertNull(areas?.areas?.single()?.floorId)
+    }
+
+    @Test
+    fun aPlayerMissingFromPlayerAreasHasNoRoom() {
+        val areas = decodeAreas(areasJson("""{"floors": [], "areas": [], "player_areas": {"p1": "bed"}}"""))
+        assertNull(areas?.playerAreas?.get("other"))
+        assertTrue(decodeAreas(areasJson("{}"))?.playerAreas?.isEmpty() == true)
+    }
+
+    @Test
+    fun malformedAreasDecodeToNull() {
+        assertNull(decodeAreas(null))
+        assertNull(decodeAreas(JsonNull))
+        assertNull(decodeAreas(areasJson("""{"areas": [{"name": "no id"}]}""")))
+        assertNull(decodeAreas(areasJson("[1, 2]")))
     }
 
     private fun event(revision: Any?) = buildJsonObject {

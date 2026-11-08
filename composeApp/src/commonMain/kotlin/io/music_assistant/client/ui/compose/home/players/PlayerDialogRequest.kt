@@ -19,6 +19,11 @@ sealed interface PlayerDialogRequest {
 
     data class SleepTimer(override val playerId: String) : PlayerDialogRequest
 
+    data class Room(override val playerId: String) : PlayerDialogRequest
+
+    /** Asks which speaker of a stereo pair is the left one. */
+    data class Stereo(override val playerId: String) : PlayerDialogRequest
+
     /** The lyrics of a track, or the transcript of a podcast episode, with [itemId] the current queue item. */
     data class Lyrics(override val playerId: String, val itemId: String) : PlayerDialogRequest
 
