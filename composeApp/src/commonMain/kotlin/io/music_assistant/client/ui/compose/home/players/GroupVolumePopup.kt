@@ -42,19 +42,24 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import io.music_assistant.client.data.model.client.PlayerData
+import io.music_assistant.client.data.speakers.SpeakerList
 import io.music_assistant.client.ui.compose.common.action.PlayerAction
 import io.music_assistant.client.ui.inactive
 import musicassistantclient.composeapp.generated.resources.Res
 import musicassistantclient.composeapp.generated.resources.players_group_volume
 import org.jetbrains.compose.resources.stringResource
 
-/** One speaker row of the group volume pop-up. [isLeader] rows act on the player itself. */
+/**
+ * One speaker row of the group volume pop-up. [isLeader] rows act on the player itself;
+ * [isGroupRoom] rows are a pair or permanent group, driven through its group volume.
+ */
 internal data class GroupVolumeMember(
     val id: String,
     val name: String,
     val volume: Float,
     val isMuted: Boolean?,
     val isLeader: Boolean,
+    val isGroupRoom: Boolean = false,
 )
 
 /**
@@ -83,6 +88,45 @@ internal fun groupVolumeMembers(player: PlayerData, localPlayerId: String?): Lis
     return (listOfNotNull(leader) + children).sortedBy { it.name.lowercase() }
 }
 
+/** The group [player] belongs to in the speaker list, as leader or member; null when it is in none. */
+private fun SpeakerList.groupOf(player: PlayerData) =
+    groups.firstOrNull { it.leader == player.playerId || player.playerId in it.members }
+
+/**
+ * One row per room of the group, as the web shows them. Hidden pair speakers have no player of their
+ * own, so rooms come from the speaker list; a stock server has none, so the bound children are used.
+ */
+internal fun groupVolumeRooms(
+    player: PlayerData,
+    list: SpeakerList?,
+    players: List<PlayerData>,
+    localPlayerId: String?,
+): List<GroupVolumeMember> {
+    if (list == null) return groupVolumeMembers(player, localPlayerId)
+    val group = list.groupOf(player) ?: return emptyList()
+    return (listOf(group.leader) + group.members).distinct()
+        .filter { it != localPlayerId }
+        .mapNotNull { id ->
+            val p = players.firstOrNull { it.playerId == id }?.player?.takeIf { !it.isPoweredOff }
+                ?: return@mapNotNull null
+            val name = list.rooms[id]?.name ?: p.name
+            val isLeader = id == group.leader
+            if (p.isGroup) {
+                val level = p.groupVolume ?: return@mapNotNull null
+                GroupVolumeMember(id, name, level, p.groupVolumeMuted, isLeader, isGroupRoom = true)
+            } else {
+                if (!p.canSetVolume) return@mapNotNull null
+                val level = p.volumeLevel ?: return@mapNotNull null
+                GroupVolumeMember(id, name, level, p.volumeMuted.takeIf { p.canMute }, isLeader)
+            }
+        }
+        .sortedBy { it.name.lowercase() }
+}
+
+/** The player whose group volume the bottom slider drives: the group's leader, else [player]. */
+internal fun groupVolumeLeader(player: PlayerData, list: SpeakerList?, players: List<PlayerData>): PlayerData =
+    list?.groupOf(player)?.let { g -> players.firstOrNull { it.playerId == g.leader } } ?: player
+
 /** Puts the pop-up's bottom edge on the volume bar's bottom edge, so the group row covers the bar. */
 private class BarBottomPositionProvider(private val barBottomPx: Int) : PopupPositionProvider {
     override fun calculatePosition(
@@ -99,8 +143,8 @@ private class BarBottomPositionProvider(private val barBottomPx: Int) : PopupPos
  */
 @Composable
 internal fun GroupVolumePopup(
-    player: PlayerData,
-    localPlayerId: String?,
+    rows: List<GroupVolumeMember>,
+    leader: PlayerData,
     barBottomPx: Int,
     tint: Color,
     playerAction: (String, PlayerAction) -> Unit,
@@ -113,7 +157,6 @@ internal fun GroupVolumePopup(
     val positionProvider = remember(barBottomPx) { BarBottomPositionProvider(barBottomPx) }
     // Starts at the bottom, where the group row sits; the value is clamped once the list is measured.
     val scrollState = rememberScrollState(initial = Int.MAX_VALUE)
-    val members = groupVolumeMembers(player, localPlayerId)
     val inactiveTint = tint.inactive()
 
     // The content scrolls, so its own drag would swallow a downward pull; the leftover pull at the
@@ -188,7 +231,7 @@ internal fun GroupVolumePopup(
                         .padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    members.forEach { member ->
+                    rows.forEach { member ->
                         // Stable key: a volume echo from the server never rebuilds a slider mid-drag.
                         key(member.id) {
                             Column {
@@ -198,14 +241,43 @@ internal fun GroupVolumePopup(
                                     isMuted = member.isMuted,
                                     enabled = true,
                                     onMuteToggle = {
+                                        val muted = member.isMuted == true
                                         playerAction(
                                             member.id,
-                                            PlayerAction.ToggleMute(isMutedNow = member.isMuted == true),
+                                            if (member.isGroupRoom) {
+                                                PlayerAction.GroupToggleMute(isMutedNow = muted)
+                                            } else {
+                                                PlayerAction.ToggleMute(isMutedNow = muted)
+                                            },
                                         )
                                     },
-                                    onVolumeSet = { playerAction(member.id, PlayerAction.VolumeSet(it.toDouble())) },
-                                    onStepDown = { playerAction(member.id, PlayerAction.VolumeDown) },
-                                    onStepUp = { playerAction(member.id, PlayerAction.VolumeUp) },
+                                    onVolumeSet = {
+                                        val level = it.toDouble()
+                                        playerAction(
+                                            member.id,
+                                            if (member.isGroupRoom) {
+                                                PlayerAction.GroupVolumeSet(level)
+                                            } else {
+                                                PlayerAction.VolumeSet(level)
+                                            },
+                                        )
+                                    },
+                                    onStepDown = {
+                                        val down = if (member.isGroupRoom) {
+                                            PlayerAction.GroupVolumeDown
+                                        } else {
+                                            PlayerAction.VolumeDown
+                                        }
+                                        playerAction(member.id, down)
+                                    },
+                                    onStepUp = {
+                                        val up = if (member.isGroupRoom) {
+                                            PlayerAction.GroupVolumeUp
+                                        } else {
+                                            PlayerAction.VolumeUp
+                                        }
+                                        playerAction(member.id, up)
+                                    },
                                     thumbColor = tint,
                                     activeTrackColor = tint,
                                     inactiveTrackColor = inactiveTint,
@@ -217,29 +289,29 @@ internal fun GroupVolumePopup(
                     HorizontalDivider()
                     key("group") {
                         Column {
-                            RowName(stringResource(Res.string.players_group_volume, player.player.name))
+                            RowName(stringResource(Res.string.players_group_volume, leader.player.name))
                             VolumeRow(
-                                volume = player.player.groupVolume,
-                                isMuted = player.player.groupVolumeMuted,
-                                enabled = player.player.groupVolume != null,
+                                volume = leader.player.groupVolume,
+                                isMuted = leader.player.groupVolumeMuted,
+                                enabled = leader.player.groupVolume != null,
                                 onMuteToggle = {
                                     playerAction(
-                                        player.player.id,
-                                        PlayerAction.GroupToggleMute(isMutedNow = player.player.groupVolumeMuted),
+                                        leader.player.id,
+                                        PlayerAction.GroupToggleMute(isMutedNow = leader.player.groupVolumeMuted),
                                     )
                                 },
                                 onVolumeSet = {
-                                    playerAction(player.player.id, PlayerAction.GroupVolumeSet(it.toDouble()))
+                                    playerAction(leader.player.id, PlayerAction.GroupVolumeSet(it.toDouble()))
                                 },
-                                onStepDown = { playerAction(player.player.id, PlayerAction.GroupVolumeDown) },
-                                onStepUp = { playerAction(player.player.id, PlayerAction.GroupVolumeUp) },
+                                onStepDown = { playerAction(leader.player.id, PlayerAction.GroupVolumeDown) },
+                                onStepUp = { playerAction(leader.player.id, PlayerAction.GroupVolumeUp) },
                                 thumbColor = tint,
                                 activeTrackColor = tint,
                                 inactiveTrackColor = inactiveTint,
                                 muteIconTint = tint,
                                 // The group slider sends to every member, so it sends less often.
                                 throttleMs = LiveVolumeSender.groupThrottleMs(
-                                    player.childrenBinds.count { it.isBound },
+                                    leader.childrenBinds.count { it.isBound }.coerceAtLeast(rows.size),
                                 ),
                             )
                         }

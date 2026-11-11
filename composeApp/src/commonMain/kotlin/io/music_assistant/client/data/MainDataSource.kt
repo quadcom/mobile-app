@@ -59,6 +59,7 @@ import io.music_assistant.client.data.repository.MediaItemChange
 import io.music_assistant.client.data.repository.MediaItemRepository
 import io.music_assistant.client.data.repository.ProviderRepository
 import io.music_assistant.client.data.repository.favoriteAfter
+import io.music_assistant.client.data.speakers.SpeakerListSource
 import io.music_assistant.client.player.MediaSessionBridge
 import io.music_assistant.client.settings.SettingsRepository
 import io.music_assistant.client.ui.Timings
@@ -159,6 +160,7 @@ class MainDataSource(
     private val playerFactory: PlayerFactory,
     private val queueFactory: QueueFactory,
     private val playDispatcher: PlayDispatcher,
+    private val speakerListSource: SpeakerListSource,
     providerRepository: ProviderRepository,
 ) : CoroutineScope {
     private val log = Logger.withTag("MainDataSource")
@@ -171,6 +173,7 @@ class MainDataSource(
         val localData: PlayerData?,
         val favoriteOverrides: Map<String, Boolean?>,
         val busyQueueIds: Set<String>,
+        val roomLeaders: Map<String, String>,
     )
 
     /** Local (Sendspin) player lifecycle, state and commands live in the controller. */
@@ -458,9 +461,21 @@ class MainDataSource(
                 settings.playersSorting,
                 _queueInfos,
                 localPlayerController.localPlayerData,
-                combine(_favoriteOverrides, playDispatcher.busyQueueIds, ::Pair),
-            ) { players, sortedIds, queues, localData, (favOverrides, busyQueueIds) ->
-                PlayerBuildInputs(players, sortedIds, queues, localData, favOverrides, busyQueueIds)
+                combine(
+                    _favoriteOverrides,
+                    playDispatcher.busyQueueIds,
+                    speakerListSource.list,
+                ) { favOverrides, busyQueueIds, list -> Triple(favOverrides, busyQueueIds, list) },
+            ) { players, sortedIds, queues, localData, (favOverrides, busyQueueIds, list) ->
+                PlayerBuildInputs(
+                    players,
+                    sortedIds,
+                    queues,
+                    localData,
+                    favOverrides,
+                    busyQueueIds,
+                    list?.bound.orEmpty(),
+                )
             }
                 .debounce(Timings.EVENT_DEBOUNCE) // Small debounce to batch rapid updates, but don't delay initial load
                 .collect { input ->
@@ -476,6 +491,7 @@ class MainDataSource(
                                 input.localData,
                                 input.favoriteOverrides,
                                 input.busyQueueIds,
+                                input.roomLeaders,
                                 oldValues,
                             ),
                         )
@@ -829,6 +845,7 @@ class MainDataSource(
         localData: PlayerData?,
         favoriteOverrides: Map<String, Boolean?>,
         busyQueueIds: Set<String>,
+        roomLeaders: Map<String, String>,
         oldValues: DataState<List<PlayerData>>,
     ): List<PlayerData> {
         val localPlayerId = settings.sendspinEffectivePlayerId.value
@@ -841,7 +858,9 @@ class MainDataSource(
             .map { player ->
                 val isLocal = player.id == localPlayerId
                 val parent =
-                    (player.activeGroup ?: player.syncedTo)
+                    // A member room the speaker list names counts as grouped even when the server's own
+                    // fields say nothing (a hidden stereo pair joined to a leader).
+                    (player.activeGroup ?: player.syncedTo ?: roomLeaders[player.id]?.takeIf { it != player.id })
                         ?.let { parentId -> allPlayers.firstOrNull { it.id == parentId } }
                         ?.asParentBind()
                 val groupChildren =
@@ -1643,6 +1662,8 @@ class MainDataSource(
 
     private fun updatePlayersAndQueues() {
         log.i { "Updating players and queues" }
+        // The pager needs the room list from the start; a stock server fails the read quietly.
+        speakerListSource.refresh()
         launch {
             apiClient.sendRequest(Request.Player.all())
                 .resultAs<List<ServerPlayer>>()?.let { playerFactory.createList(it) }

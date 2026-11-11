@@ -99,6 +99,7 @@ import io.music_assistant.client.data.model.client.items.PodcastEpisode
 import io.music_assistant.client.data.model.client.items.Track
 import io.music_assistant.client.data.play.PlayMode
 import io.music_assistant.client.data.repository.QueueOverlayRepository
+import io.music_assistant.client.data.speakers.SpeakerList
 import io.music_assistant.client.data.speakers.SpeakerListSource
 import io.music_assistant.client.ui.alphaOn
 import io.music_assistant.client.ui.compose.common.CenteredThreeSlotRow
@@ -455,6 +456,7 @@ fun PlayersPager(
                                 onClose = onClose,
                                 queueAction = { homeScreenViewModel.queueAction(it) },
                                 allPlayers = playerDataList,
+                                speakerList = speakerList,
                                 moveToPlayer = moveToPlayer,
                                 isWideScreen = isWideScreen,
                                 sendspinState = state.sendspinState,
@@ -567,6 +569,7 @@ private fun ExpandedPlayerPage(
     navigateToItem: (AppMediaItem) -> Unit = {},
     onChooseArtist: () -> Unit = {},
     livePositionFlow: Flow<Double>?,
+    speakerList: SpeakerList? = null,
     bufferedAheadSecFlow: Flow<Double>? = null,
     lyricsAvailable: Boolean = false,
     onLyricsClick: () -> Unit = {},
@@ -813,7 +816,8 @@ private fun ExpandedPlayerPage(
                         }
                         val localPlayerId = allPlayers.firstOrNull { it.isLocal }?.playerId
                         // A tap opens the per-speaker pop-up only when it has speakers to show.
-                        val opensGroupPopup = isGroupBound && groupVolumeMembers(player, localPlayerId).isNotEmpty()
+                        val volumeRows = groupVolumeRooms(player, speakerList, allPlayers, localPlayerId)
+                        val opensGroupPopup = volumeRows.isNotEmpty()
                         var showGroupPopup by remember { mutableStateOf(false) }
                         var barBottomPx by remember { mutableStateOf<Int?>(null) }
                         if (!opensGroupPopup && showGroupPopup) showGroupPopup = false
@@ -948,8 +952,8 @@ private fun ExpandedPlayerPage(
                         if (showGroupPopup && opensGroupPopup) {
                             barBottomPx?.let { bottom ->
                                 GroupVolumePopup(
-                                    player = player,
-                                    localPlayerId = localPlayerId,
+                                    rows = volumeRows,
+                                    leader = groupVolumeLeader(player, speakerList, allPlayers),
                                     barBottomPx = bottom,
                                     tint = controlTint,
                                     playerAction = playerActionById,
