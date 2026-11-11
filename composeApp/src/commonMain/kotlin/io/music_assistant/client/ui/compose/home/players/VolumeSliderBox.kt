@@ -25,6 +25,10 @@ import kotlin.math.roundToInt
  * the volume down, a tap on the right half steps it up. Taps on/near the thumb and
  * drags are handed off to the slider so normal dragging still works.
  *
+ * When [tapOpens] is true (a grouped bar), every tap, thumb included, goes to
+ * [onStepDown] / [onStepUp] (the caller maps them to opening the list) and the thumb is
+ * not handed to the slider; a drag that starts on the thumb still moves it.
+ *
  * In relative mode ([LocalVolumePreferences]) the box owns every gesture instead: a drag
  * adjusts the volume from where it started ([relativeVolume]) and reports it through
  * [onValueChange] / [onValueChangeFinished], the same callbacks the slider is given.
@@ -36,6 +40,7 @@ import kotlin.math.roundToInt
 fun VolumeSliderBox(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    tapOpens: Boolean = false,
     volume: () -> Float,
     onStepDown: () -> Unit,
     onStepUp: () -> Unit,
@@ -50,7 +55,7 @@ fun VolumeSliderBox(
     val onValueChangeForGesture by rememberUpdatedState(onValueChange)
     val onValueChangeFinishedForGesture by rememberUpdatedState(onValueChangeFinished)
     val gesture = if (enabled) {
-        Modifier.pointerInput(relative) {
+        Modifier.pointerInput(relative, tapOpens) {
             awaitEachGesture {
                 val widthPx = size.width
                 if (widthPx == 0) return@awaitEachGesture
@@ -60,9 +65,12 @@ fun VolumeSliderBox(
                 )
                 val thumbCenter = (volumeForGesture / 100f) * widthPx
                 // Tap on/near thumb: hand off to the Slider so dragging works normally.
-                if (!relative && abs(down.position.x - thumbCenter) <= thumbHitPx) {
+                val nearThumb = !relative && abs(down.position.x - thumbCenter) <= thumbHitPx
+                if (nearThumb && !tapOpens) {
                     return@awaitEachGesture
                 }
+                // A grouped bar keeps the press so a tap on the thumb opens the list; only a drag moves it.
+                val thumbDrag = nearThumb && tapOpens
                 down.consume()
                 var dragged = false
                 // Measured from where the drag was recognised, so slop travel is no volume change.
@@ -84,9 +92,12 @@ fun VolumeSliderBox(
                             relativeVolume(startVolume, change.position.x - anchorX, widthPx.toFloat()),
                         )
                     }
+                    if (thumbDrag && dragged && !change.changedToUp()) {
+                        onValueChangeForGesture((change.position.x / widthPx * 100f).coerceIn(0f, 100f))
+                    }
                     if (change.changedToUp()) {
                         change.consume()
-                        if (relative && dragged) onValueChangeFinishedForGesture()
+                        if ((relative || thumbDrag) && dragged) onValueChangeFinishedForGesture()
                         if (!dragged) {
                             if (down.position.x < widthPx / 2f) onStepDown() else onStepUp()
                         }

@@ -772,7 +772,7 @@ private fun ExpandedPlayerPage(
 
                 // Fixed-height shell keeps album art space consistent whether
                 // the volume control is shown for this player.
-                Box(modifier = Modifier.fillMaxWidth().height(36.dp)) {
+                Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).height(48.dp)) {
                     if (player.player.isVolumeSliderAccessible && player.player.currentVolume != null) {
                         var currentVolume by remember { mutableStateOf(player.player.currentVolume) }
                         // The server echoes each live send; applying it mid-drag would yank the thumb back.
@@ -874,6 +874,7 @@ private fun ExpandedPlayerPage(
                                 volumeSender.finish(currentVolume)
                             }
                             VolumeSliderBox(
+                                tapOpens = opensGroupPopup,
                                 modifier = Modifier.weight(1f).then(
                                     if (opensGroupPopup) {
                                         Modifier.semantics {
