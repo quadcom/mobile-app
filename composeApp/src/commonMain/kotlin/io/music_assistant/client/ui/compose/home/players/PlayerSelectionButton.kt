@@ -14,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -22,10 +23,14 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.music_assistant.client.data.model.client.PlayerData
 import io.music_assistant.client.data.model.client.PlayerDataFixtures
+import io.music_assistant.client.data.speakers.SpeakerListSource
+import io.music_assistant.client.ui.compose.home.players.speakers.word
 import io.music_assistant.sendspin.api.PlayerState
 import org.jetbrains.compose.resources.painterResource
+import org.koin.compose.koinInject
 
 @Composable
 fun PlayerSelectionButton(
@@ -34,6 +39,7 @@ fun PlayerSelectionButton(
     sendSpinState: PlayerState?,
     onSelectPlayer: () -> Unit = {},
     labelOverride: String? = null,
+    groupLabel: String? = rememberGroupLabel(player),
 ) {
     val isLocalPlayer = player.isLocal
     val dotColor = (if (isLocalPlayer) sendSpinState else null)?.toDotColor()
@@ -51,9 +57,16 @@ fun PlayerSelectionButton(
             player = player,
             controlTint = controlTint,
             dotColor = dotColor,
-            labelOverride = labelOverride,
+            labelOverride = labelOverride ?: groupLabel,
         )
     }
+}
+
+// Read here, not in previews: a preview has no Koin, so each preview passes groupLabel = null.
+@Composable
+private fun rememberGroupLabel(player: PlayerData): String? {
+    val speakerList by koinInject<SpeakerListSource>().list.collectAsStateWithLifecycle()
+    return speakerList?.ledColour(player.playerId)?.word()
 }
 
 @Composable
@@ -106,6 +119,7 @@ private fun PlayerSelectionButtonNotGroupablePreview() {
         PlayerSelectionButton(
             player = PlayerDataFixtures.playerData(),
             sendSpinState = null,
+            groupLabel = null,
         )
     }
 }
@@ -117,6 +131,7 @@ private fun PlayerSelectionButtonLocalPlayerPreview() {
         PlayerSelectionButton(
             player = PlayerDataFixtures.playerData().copy(isLocal = true),
             sendSpinState = PlayerState.Connecting(0),
+            groupLabel = null,
         )
     }
 }
@@ -130,6 +145,7 @@ private fun PlayerSelectionButtonPreview() {
                 groupChildren = listOf(PlayerDataFixtures.bind().copy(isBound = false)),
             ),
             sendSpinState = null,
+            groupLabel = null,
         )
     }
 }

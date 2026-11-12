@@ -12,6 +12,8 @@ data class PlayerData(
     val pendingPlay: Boolean = false,
     /** A play request for this player's queue is in flight, from this app or from any client. */
     val playRequestPending: Boolean = false,
+    /** Another room follows this one in a speaker-list group, so it shows the group icon. */
+    val leadsRoomGroup: Boolean = false,
 ) {
     val playerId = player.id
     val queueInfo = (queue as? DataState.Data)?.data?.info
@@ -64,6 +66,7 @@ data class PlayerData(
             isLocal = other.isLocal,
             pendingPlay = other.pendingPlay,
             playRequestPending = other.playRequestPending,
+            leadsRoomGroup = other.leadsRoomGroup,
         )
     }
 

@@ -25,7 +25,12 @@ fun PlayerData.label(): String {
     return playerLabel
 }
 
-fun PlayerData.iconRes(): DrawableResource {
-    val iconId = if (this.isLocal) SharedIcons.SMARTPHONE else this.player.icon
+/** A room card passes `asGroup = false` so it keeps the room's own icon. */
+fun PlayerData.iconRes(asGroup: Boolean = true): DrawableResource {
+    val iconId = when {
+        isLocal -> SharedIcons.SMARTPHONE
+        asGroup && leadsRoomGroup -> SharedIcons.SPEAKERS
+        else -> player.icon
+    }
     return SharedIcons.getResource(iconId)
 }

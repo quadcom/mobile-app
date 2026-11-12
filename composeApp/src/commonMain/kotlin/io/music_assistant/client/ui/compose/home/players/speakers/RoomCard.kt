@@ -103,7 +103,7 @@ internal fun RoomCard(
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            painter = painterResource(player.iconRes()),
+            painter = painterResource(player.iconRes(asGroup = false)),
             contentDescription = null,
             modifier = Modifier
                 .align(Alignment.TopStart)

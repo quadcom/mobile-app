@@ -854,6 +854,7 @@ class MainDataSource(
             serverPlayers.sortedBy { player -> sortedIds.indexOf(player.id).takeIf { it >= 0 } ?: Int.MAX_VALUE }
         } ?: serverPlayers.sortedBy { it.name }
         val oldPlayers = (oldValues as? DataState.Data)?.data.orEmpty()
+        val leaders = roomLeaders.values.toSet()
         val playerDataList = allPlayers
             .map { player ->
                 val isLocal = player.id == localPlayerId
@@ -904,6 +905,7 @@ class MainDataSource(
                         parentBind = parent,
                         childrenBinds = groupChildren,
                         isLocal = isLocal,
+                        leadsRoomGroup = player.id in leaders,
                     )
                 }
                 // Preserve loaded queue items from previous state
