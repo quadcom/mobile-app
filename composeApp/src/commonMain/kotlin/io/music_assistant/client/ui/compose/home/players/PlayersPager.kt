@@ -457,6 +457,7 @@ fun PlayersPager(
                                 queueAction = { homeScreenViewModel.queueAction(it) },
                                 allPlayers = playerDataList,
                                 speakerList = speakerList,
+                                everyPlayer = state.allPlayerData,
                                 moveToPlayer = moveToPlayer,
                                 isWideScreen = isWideScreen,
                                 sendspinState = state.sendspinState,
@@ -570,6 +571,8 @@ private fun ExpandedPlayerPage(
     onChooseArtist: () -> Unit = {},
     livePositionFlow: Flow<Double>?,
     speakerList: SpeakerList? = null,
+    // Every player, members without a page of their own included, so a joined room's volume row can be found.
+    everyPlayer: List<PlayerData> = allPlayers,
     bufferedAheadSecFlow: Flow<Double>? = null,
     lyricsAvailable: Boolean = false,
     onLyricsClick: () -> Unit = {},
@@ -816,7 +819,7 @@ private fun ExpandedPlayerPage(
                         }
                         val localPlayerId = allPlayers.firstOrNull { it.isLocal }?.playerId
                         // A tap opens the per-speaker pop-up only when it has speakers to show.
-                        val volumeRows = groupVolumeRooms(player, speakerList, allPlayers, localPlayerId)
+                        val volumeRows = groupVolumeRooms(player, speakerList, everyPlayer, localPlayerId)
                         val opensGroupPopup = volumeRows.isNotEmpty()
                         var showGroupPopup by remember { mutableStateOf(false) }
                         var barBottomPx by remember { mutableStateOf<Int?>(null) }
@@ -953,7 +956,7 @@ private fun ExpandedPlayerPage(
                             barBottomPx?.let { bottom ->
                                 GroupVolumePopup(
                                     rows = volumeRows,
-                                    leader = groupVolumeLeader(player, speakerList, allPlayers),
+                                    leader = groupVolumeLeader(player, speakerList, everyPlayer),
                                     barBottomPx = bottom,
                                     tint = controlTint,
                                     playerAction = playerActionById,
