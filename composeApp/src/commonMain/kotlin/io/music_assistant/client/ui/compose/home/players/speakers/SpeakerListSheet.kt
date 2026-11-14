@@ -64,8 +64,9 @@ import org.koin.compose.koinInject
 private const val GROUP_ROW_ANIM_MS = 500
 
 /**
- * The speaker list: a row per playing room (plus the active one) on top, then every other room as
- * a square card by floor. The group editor opens on top of it and returns here when dismissed.
+ * The speaker list: a row per playing room (plus the active one) on top, then every room as a square
+ * card by floor, the rooms with a row included. The group editor opens on top of it and returns here
+ * when dismissed.
  *
  * [topOrder] lives in the caller so the order of the top rows survives closing the sheet.
  */
@@ -171,10 +172,12 @@ fun SpeakerListSheet(
             }
 
             val topIds = order.toSet()
-            val phone = players.firstOrNull { it.isLocal && it.playerId !in topIds }
+            // A room with a top row keeps its card below too, so picking a room or a room starting or
+            // stopping never reshapes the list (Adrian, 2026-11-13: "a lot of layout shift").
+            val phone = players.firstOrNull { it.isLocal }
             // The phone is lifted out of the server's sections into "This phone".
             val sections = listSections(list, players) { room, server ->
-                room.playerId !in topIds && !room.isLocal &&
+                !room.isLocal &&
                     (!hideUnavailable || (server?.available ?: room.player.isSelectable))
             }
             val unavailableText = stringResource(Res.string.player_unavailable)
@@ -203,17 +206,13 @@ fun SpeakerListSheet(
                         val members = membersOf(row, players, bound).filter { it.playerId !in topIds }
                         // The leader is a card too, first, so every speaker in the group shows.
                         val groupCards = if (groupColour != null) listOf(row) + members else members
-                        // Only group rows animate, 0.5 s ease-out (Adrian, 2026-11-05: a big paused group
-                        // vanishing was "jarring"); lone rooms swapping in the same place stay still.
+                        // Every top row fades and moves over 0.5 s ease-out, lone rooms too, so nothing
+                        // jumps (Adrian, 2026-11-13: "Slide and fade too"; groups since 2026-11-05).
                         val rowSpec = tween<Float>(GROUP_ROW_ANIM_MS, easing = EaseOut)
                         val placeSpec = tween<IntOffset>(GROUP_ROW_ANIM_MS, easing = EaseOut)
                         Column(
                             modifier = Modifier
-                                .animateItem(
-                                    fadeInSpec = if (groupCards.isNotEmpty()) rowSpec else null,
-                                    placementSpec = if (groupCards.isNotEmpty()) placeSpec else null,
-                                    fadeOutSpec = if (groupCards.isNotEmpty()) rowSpec else null,
-                                )
+                                .animateItem(fadeInSpec = rowSpec, placementSpec = placeSpec, fadeOutSpec = rowSpec)
                                 .animateContentSize()
                                 .padding(horizontal = 16.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
