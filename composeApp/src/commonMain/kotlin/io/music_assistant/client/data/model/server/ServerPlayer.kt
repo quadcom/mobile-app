@@ -2,6 +2,10 @@ package io.music_assistant.client.data.model.server
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 
 /**
  * Server-side player payload.
@@ -69,7 +73,22 @@ data class ServerPlayer(
     @SerialName("announcement_in_progress") val announcementInProgress: Boolean? = null,
     /** Unix (UTC) timestamp in seconds at which the sleep timer stops playback. */
     @SerialName("sleep_timer_expires_at") val sleepTimerExpiresAt: Double? = null,
+    @SerialName("extra_attributes") val extraAttributes: ServerPlayerExtraAttributes? = null,
 )
+
+/** The keys of the player's free-form `extra_attributes` map that the client reads; the rest are ignored. */
+@Serializable
+data class ServerPlayerExtraAttributes(
+    /**
+     * Set on the hidden player the server makes to lead a group (PLAN_MMA_28). Kept loose so a value of an
+     * unexpected type cannot fail the whole player list: anything but absent, null or `false` marks it.
+     */
+    @SerialName("virtual_leader") val virtualLeader: JsonElement? = null,
+) {
+    val isVirtualLeader: Boolean
+        get() = virtualLeader != null && virtualLeader != JsonNull &&
+            (virtualLeader as? JsonPrimitive)?.booleanOrNull != false
+}
 
 // @Serializable
 // data class DeviceInfo(

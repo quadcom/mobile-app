@@ -34,10 +34,11 @@ data class Player(
     /** Unix (UTC) timestamp in seconds at which the sleep timer stops playback. */
     val sleepTimerExpiresAt: Double? = null,
     /**
-     * A hidden, enabled group player. The server's virtual group leaders are hidden, so the app keeps
-     * these and shows one only while the speaker list names it a group's leader (PLAN_MMA_28).
+     * The hidden player the server makes to lead a group (`extra_attributes.virtual_leader`). It is a plain
+     * player, not a GROUP; the app keeps it and shows it only while the speaker list names it a group's
+     * leader (PLAN_MMA_28).
      */
-    val isHiddenGroup: Boolean = false,
+    val isVirtualLeader: Boolean = false,
 ) {
     /**
      * The player is there but asleep. Two server states look identical to the user — a
@@ -64,7 +65,8 @@ data class Player(
      * A leader has no parent of its own, and a permanent member is never removable.
      */
     val canLeaveOwnGroup: Boolean
-        get() = isGrouped &&
+        // A virtual leader is no speaker that could leave; its group ends when its members go.
+        get() = isGrouped && !isVirtualLeader &&
             activeGroup == null &&
             syncedTo == null &&
             staticGroupMembers?.contains(id) != true

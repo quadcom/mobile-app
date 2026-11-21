@@ -85,8 +85,13 @@ data class SpeakerRoom(
     val groupKind: String? = null,
 )
 
-/** A group made on the fly; members are in name order. */
-data class SpeakerGroup(val leader: String, val colour: GroupColour?, val members: List<String>)
+/** A group made on the fly; members are in name order. [groupWith] is what the group editor offers, if sent. */
+data class SpeakerGroup(
+    val leader: String,
+    val colour: GroupColour?,
+    val members: List<String>,
+    val groupWith: List<String>? = null,
+)
 
 /** A group that stays; a stereo pair is one with a left speaker chosen. */
 data class PermanentGroup(
@@ -159,6 +164,7 @@ private data class GroupDto(
     val leader: String = "",
     val colour: String? = null,
     val members: List<String> = emptyList(),
+    @SerialName("group_with") val groupWith: List<String>? = null,
 )
 
 /** Decodes the `hass/speaker_list` reply; unknown keys are ignored and missing ones take plain defaults. */
@@ -179,7 +185,14 @@ internal fun decodeSpeakerList(json: String): SpeakerList {
                 groupKind = r.groupKind,
             )
         },
-        groups = reply.groups.map { SpeakerGroup(it.leader, GroupColour.fromWire(it.colour), it.members) },
+        groups = reply.groups.map {
+            SpeakerGroup(
+                leader = it.leader,
+                colour = GroupColour.fromWire(it.colour),
+                members = it.members,
+                groupWith = it.groupWith,
+            )
+        },
         permanentGroups = reply.permanentGroups.map {
             PermanentGroup(it.player, it.name, it.members, it.isStereoPair, it.stereoLeft)
         },

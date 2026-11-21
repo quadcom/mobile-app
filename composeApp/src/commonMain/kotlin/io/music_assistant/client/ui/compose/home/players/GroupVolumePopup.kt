@@ -68,7 +68,8 @@ internal data class GroupVolumeMember(
  * volume has no meaning for the group.
  */
 internal fun groupVolumeMembers(player: PlayerData, localPlayerId: String?): List<GroupVolumeMember> {
-    val leader = player.player.takeIf { !it.isGroup && it.canSetVolume }
+    // A virtual leader's own level is the group's; the master row already shows it.
+    val leader = player.player.takeIf { !it.isGroup && !it.isVirtualLeader && it.canSetVolume }
         ?.let { p ->
             p.volumeLevel?.let { level ->
                 GroupVolumeMember(

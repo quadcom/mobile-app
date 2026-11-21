@@ -55,7 +55,12 @@ internal fun GroupEditorSheet(
     // plus the leader and its current members so they show highlighted. Never the phone, and an unreachable
     // room is offered only to take it out.
     val sections = remember(list, leader, players, bound) {
-        val offeredIds = (list?.rooms?.get(leader.playerId)?.groupWith ?: leader.childrenBinds.map { it.id })
+        // A virtual leader has no room row, so its group's own `group_with` comes first.
+        val offeredIds = (
+            list?.groups?.firstOrNull { it.leader == leader.playerId }?.groupWith
+                ?: list?.rooms?.get(leader.playerId)?.groupWith
+                ?: leader.childrenBinds.map { it.id }
+            )
             .toSet() + leader.playerId + bound.filterValues { it == leader.playerId }.keys
         listSections(list, players) { room, _ ->
             room.playerId in offeredIds && !room.isLocal && (

@@ -863,9 +863,11 @@ class MainDataSource(
                 val isLocal = player.id == localPlayerId
                 val parent =
                     // A member room the speaker list names counts as grouped even when the server's own
-                    // fields say nothing (a hidden stereo pair joined to a leader).
-                    (player.activeGroup ?: player.syncedTo ?: roomLeaders[player.id]?.takeIf { it != player.id })
-                        ?.let { parentId -> allPlayers.firstOrNull { it.id == parentId } }
+                    // fields say nothing (a hidden stereo pair joined to a leader). The first link that names a
+                    // shown player wins: a pair's rooms are synced to the pair's hidden driver, which is never shown.
+                    listOfNotNull(player.activeGroup, player.syncedTo, roomLeaders[player.id])
+                        .filter { it != player.id }
+                        .firstNotNullOfOrNull { parentId -> allPlayers.firstOrNull { it.id == parentId } }
                         ?.asParentBind()
                 val groupChildren =
                     // No children for local player or if player is part of group
@@ -1359,7 +1361,7 @@ class MainDataSource(
                     when (event) {
                         is PlayerAddedEvent -> {
                             playerFactory.create(event.data)
-                                .takeIf { it.isListed || it.isHiddenGroup }
+                                .takeIf { it.isListed || it.isVirtualLeader }
                                 ?.let { newPlayer ->
                                     _serverPlayers.update { oldState ->
                                         when (oldState) {
@@ -1410,7 +1412,7 @@ class MainDataSource(
                                     is DataState.Data -> {
                                         val players = oldState.data
                                         DataState.Data(
-                                            if (data.isListed || data.isHiddenGroup) {
+                                            if (data.isListed || data.isVirtualLeader) {
                                                 if (players.any { it.id == data.id }) {
                                                     players.map { if (it.id == data.id) data else it }
                                                 } else {
@@ -1673,7 +1675,7 @@ class MainDataSource(
             apiClient.sendRequest(Request.Player.all())
                 .resultAs<List<ServerPlayer>>()?.let { playerFactory.createList(it) }
                 ?.let { list ->
-                    val visiblePlayers = list.filter { it.isListed || it.isHiddenGroup }
+                    val visiblePlayers = list.filter { it.isListed || it.isVirtualLeader }
                     _serverPlayers.update {
                         DataState.Data(visiblePlayers)
                     }

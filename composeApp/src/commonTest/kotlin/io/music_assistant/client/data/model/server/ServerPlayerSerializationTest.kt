@@ -167,4 +167,17 @@ class ServerPlayerSerializationTest {
 
         assertEquals("pl1", player.playerId)
     }
+
+    @Test
+    fun theVirtualLeaderMarkerIsReadLooselyAndOnlyWhenSet() {
+        fun marked(extra: String) = playerFactory.create(
+            myJson.decodeFromString<ServerPlayer>("""{"player_id": "v1", "hide_in_ui": true, $extra}"""),
+        ).isVirtualLeader
+
+        assertEquals(true, marked(""""extra_attributes": {"virtual_leader": true}"""))
+        assertEquals(true, marked(""""extra_attributes": {"virtual_leader": "group_1"}"""))
+        assertEquals(false, marked(""""extra_attributes": {"virtual_leader": false}"""))
+        assertEquals(false, marked(""""extra_attributes": {"other": 1}"""))
+        assertEquals(false, marked(""""enabled": false, "extra_attributes": {"virtual_leader": true}"""))
+    }
 }

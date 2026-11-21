@@ -148,8 +148,9 @@ class GroupVolumeMembersTest {
 
     @Test
     fun aHiddenVirtualLeaderHasNoRowButDrivesTheGroupVolume() {
-        val virtual = room("v1", "Orange", type = PlayerType.GROUP).let {
-            it.copy(player = it.player.copy(isListed = false, isHiddenGroup = true))
+        // The server's virtual leader is a plain hidden player, not a GROUP.
+        val virtual = room("v1", "Orange").let {
+            it.copy(player = it.player.copy(isListed = false, isVirtualLeader = true, groupVolume = 40f))
         }
         val gym = room("gym", "Gym")
         val l = list(SpeakerGroup("v1", null, listOf("bath", "gym")))
