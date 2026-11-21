@@ -127,6 +127,13 @@ fun SpeakerListSheet(
             }
         }
     }
+    // The editor opens on a room; once the server hands that room's group to a hidden leader, the room is only
+    // a member and offers nothing, so the editor follows it to the leader (Adrian, 2026-11-21: "all of the
+    // speakers disappear"). It waits until the leader is shown, or the branch below would close the editor.
+    LaunchedEffect(list, players, editorFor) {
+        val id = editorFor ?: return@LaunchedEffect
+        list?.bound?.get(id)?.takeIf { it != id && players.byId(it) != null }?.let { editorFor = it }
+    }
     val listState = rememberLazyListState()
 
     ModalBottomSheet(
