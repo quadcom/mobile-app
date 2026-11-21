@@ -109,6 +109,8 @@ data class SpeakerList(
     val rooms: Map<String, SpeakerRoom>,
     val groups: List<SpeakerGroup>,
     val permanentGroups: List<PermanentGroup> = emptyList(),
+    /** An ended group's leader id to the room its music went to; the server keeps each for about a minute. */
+    val handovers: Map<String, String> = emptyMap(),
 ) {
     /** Room id to its group leader's id, for every room the server marks as a member. */
     val bound: Map<String, String> = rooms.mapNotNull { (id, room) -> room.groupLeader?.let { id to it } }.toMap()
@@ -128,6 +130,7 @@ private data class SpeakerListReply(
     val rooms: Map<String, RoomDto> = emptyMap(),
     val groups: List<GroupDto> = emptyList(),
     @SerialName("permanent_groups") val permanentGroups: List<PermanentGroupDto> = emptyList(),
+    val handovers: Map<String, String> = emptyMap(),
 )
 
 @Serializable
@@ -196,6 +199,7 @@ internal fun decodeSpeakerList(json: String): SpeakerList {
         permanentGroups = reply.permanentGroups.map {
             PermanentGroup(it.player, it.name, it.members, it.isStereoPair, it.stereoLeft)
         },
+        handovers = reply.handovers,
     )
 }
 

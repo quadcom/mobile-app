@@ -88,6 +88,16 @@ class SelectedPlayerResolutionTest {
     }
 
     @Test
+    fun `an ended group's leader resolves to the room that kept the music`() {
+        val result = resolveSelectedPlayerId(
+            visiblePlayerIds = listOf("kitchen", "gym"),
+            userChoice = "sendspin_group_1a2b3c4d",
+            leaderOf = mapOf("sendspin_group_1a2b3c4d" to "gym"),
+        )
+        assertEquals("gym", result)
+    }
+
+    @Test
     fun `respects an explicit user pick even when other players are first in the list`() {
         val result = resolveSelectedPlayerId(
             visiblePlayerIds = listOf("sendspin-local", "kitchen"),

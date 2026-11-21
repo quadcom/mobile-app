@@ -49,6 +49,16 @@ class SpeakerListSourceTest {
     }
 
     @Test
+    fun decodesTheGroupEditorListAndHandovers() {
+        val list = decodeSpeakerList(
+            """{"groups": [{"leader": "sendspin_group_1", "members": ["k"], "group_with": ["k", "g"]}],
+               "handovers": {"sendspin_group_0": "l"}}""",
+        )
+        assertEquals(listOf("k", "g"), list.groups.single().groupWith)
+        assertEquals(mapOf("sendspin_group_0" to "l"), list.handovers)
+    }
+
+    @Test
     fun missingFieldsTakePlainDefaults() {
         val list = decodeSpeakerList("{}")
         assertEquals(0, list.revision)

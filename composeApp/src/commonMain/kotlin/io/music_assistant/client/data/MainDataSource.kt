@@ -347,12 +347,14 @@ class MainDataSource(
         combine(
             _playersData,
             _userSelectedPlayerId,
-        ) { playersDataState, user ->
+            speakerListSource.list,
+        ) { playersDataState, user, list ->
             val all = (playersDataState as? DataState.Data)?.data.orEmpty()
             resolveSelectedPlayerId(
                 visiblePlayerIds = all.pagePlayers().map { it.playerId },
                 userChoice = user,
-                leaderOf = all.pageLeaders(),
+                // An ended group's hidden leader leads to the room that kept its music (PLAN_MMA_28).
+                leaderOf = list?.handovers.orEmpty() + all.pageLeaders(),
             )
         }.stateIn(this, SharingStarted.Eagerly, settings.lastSelectedPlayerId.value)
 
