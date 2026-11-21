@@ -204,8 +204,9 @@ fun SpeakerListSheet(
                     if (row != null) {
                         val groupColour = list?.ledColour(id)
                         val members = membersOf(row, players, bound).filter { it.playerId !in topIds }
-                        // The leader is a card too, first, so every speaker in the group shows.
-                        val groupCards = if (groupColour != null) listOf(row) + members else members
+                        // A real leader is a card too, first, so every speaker in the group shows; the
+                        // server's hidden virtual leader is no speaker, so it gets no card.
+                        val groupCards = if (groupColour != null && row.player.isListed) listOf(row) + members else members
                         // Every top row fades and moves over 0.5 s ease-out, lone rooms too, so nothing
                         // jumps (Adrian, 2026-11-13: "Slide and fade too"; groups since 2026-11-05).
                         val rowSpec = tween<Float>(GROUP_ROW_ANIM_MS, easing = EaseOut)

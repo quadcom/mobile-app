@@ -147,6 +147,19 @@ class GroupVolumeMembersTest {
     }
 
     @Test
+    fun aHiddenVirtualLeaderHasNoRowButDrivesTheGroupVolume() {
+        val virtual = room("v1", "Orange", type = PlayerType.GROUP).let {
+            it.copy(player = it.player.copy(isListed = false, isHiddenGroup = true))
+        }
+        val gym = room("gym", "Gym")
+        val l = list(SpeakerGroup("v1", null, listOf("bath", "gym")))
+        val all = listOf(virtual, bath, gym)
+
+        assertEquals(listOf("gym", "bath"), groupVolumeRooms(bath, l, all, null).map { it.id })
+        assertEquals("v1", groupVolumeLeader(gym, l, all).playerId)
+    }
+
+    @Test
     fun theListsRoomNameWinsOverThePlayersName() {
         val named = list(masterGroup, names = mapOf("bath" to "Bathroom"))
         val rows = groupVolumeRooms(bath, named, listOf(bath, pair), null)

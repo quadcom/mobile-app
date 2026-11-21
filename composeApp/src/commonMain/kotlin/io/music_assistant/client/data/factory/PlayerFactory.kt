@@ -54,6 +54,8 @@ class PlayerFactory(
             groupVolumeMuted = groupVolumeMuted == true,
             currentMedia = currentMedia?.let(::createPlayerMedia),
             sleepTimerExpiresAt = sleepTimerExpiresAt,
+            isHiddenGroup = enabled && PlayerType.fromServer(type) == PlayerType.GROUP &&
+                ((hidden == true) || (hideInUi == true) || hidePlayerInUi?.contains("always") == true),
         )
     }
 

@@ -109,6 +109,8 @@ internal fun groupVolumeRooms(
         .mapNotNull { id ->
             val p = players.firstOrNull { it.playerId == id }?.player?.takeIf { !it.isPoweredOff }
                 ?: return@mapNotNull null
+            // A hidden virtual leader's level is the group's master row already (Adrian, 2026-11-21).
+            if (!p.isListed) return@mapNotNull null
             val name = list.rooms[id]?.name ?: p.name
             val isLeader = id == group.leader
             if (p.isGroup) {

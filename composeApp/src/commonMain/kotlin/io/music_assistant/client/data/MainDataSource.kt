@@ -849,12 +849,15 @@ class MainDataSource(
         oldValues: DataState<List<PlayerData>>,
     ): List<PlayerData> {
         val localPlayerId = settings.sendspinEffectivePlayerId.value
+        val leaders = roomLeaders.values.toSet()
+        // A hidden group player counts only while the speaker list names it a group's leader: the server's
+        // virtual leaders (PLAN_MMA_28). Home Assistant-only groups never are, so their speakers just show busy.
+        val shown = serverPlayers.filter { it.isListed || it.id in leaders }
         // User's saved order (unknown players last, in server order); name order until one is saved.
         val allPlayers = sortedIds?.let {
-            serverPlayers.sortedBy { player -> sortedIds.indexOf(player.id).takeIf { it >= 0 } ?: Int.MAX_VALUE }
-        } ?: serverPlayers.sortedBy { it.name }
+            shown.sortedBy { player -> sortedIds.indexOf(player.id).takeIf { it >= 0 } ?: Int.MAX_VALUE }
+        } ?: shown.sortedBy { it.name }
         val oldPlayers = (oldValues as? DataState.Data)?.data.orEmpty()
-        val leaders = roomLeaders.values.toSet()
         val playerDataList = allPlayers
             .map { player ->
                 val isLocal = player.id == localPlayerId
@@ -1356,7 +1359,7 @@ class MainDataSource(
                     when (event) {
                         is PlayerAddedEvent -> {
                             playerFactory.create(event.data)
-                                .takeIf { it.isListed }
+                                .takeIf { it.isListed || it.isHiddenGroup }
                                 ?.let { newPlayer ->
                                     _serverPlayers.update { oldState ->
                                         when (oldState) {
@@ -1407,7 +1410,7 @@ class MainDataSource(
                                     is DataState.Data -> {
                                         val players = oldState.data
                                         DataState.Data(
-                                            if (data.isListed) {
+                                            if (data.isListed || data.isHiddenGroup) {
                                                 if (players.any { it.id == data.id }) {
                                                     players.map { if (it.id == data.id) data else it }
                                                 } else {
@@ -1670,7 +1673,7 @@ class MainDataSource(
             apiClient.sendRequest(Request.Player.all())
                 .resultAs<List<ServerPlayer>>()?.let { playerFactory.createList(it) }
                 ?.let { list ->
-                    val visiblePlayers = list.filter { it.isListed }
+                    val visiblePlayers = list.filter { it.isListed || it.isHiddenGroup }
                     _serverPlayers.update {
                         DataState.Data(visiblePlayers)
                     }

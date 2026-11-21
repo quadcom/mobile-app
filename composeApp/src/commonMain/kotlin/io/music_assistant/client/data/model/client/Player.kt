@@ -33,6 +33,11 @@ data class Player(
     val currentMedia: PlayerMedia?,
     /** Unix (UTC) timestamp in seconds at which the sleep timer stops playback. */
     val sleepTimerExpiresAt: Double? = null,
+    /**
+     * A hidden, enabled group player. The server's virtual group leaders are hidden, so the app keeps
+     * these and shows one only while the speaker list names it a group's leader (PLAN_MMA_28).
+     */
+    val isHiddenGroup: Boolean = false,
 ) {
     /**
      * The player is there but asleep. Two server states look identical to the user — a

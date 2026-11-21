@@ -78,7 +78,10 @@ data class SpeakerRoom(
     val area: String? = null,
     /** Set when the room is a permanent group or a stereo pair. */
     val isPermanentGroup: Boolean = false,
-    /** "permanent", "stereo_pair" or "dynamic"; null from a server that does not say. */
+    /**
+     * "permanent", "stereo_pair" or "regular" (a hand-made group; older servers said "dynamic"); null from a
+     * server that does not say. Home Assistant-only dynamic groups never appear in the speaker list.
+     */
     val groupKind: String? = null,
 )
 
